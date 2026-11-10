@@ -1,5 +1,14 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
+}
+
+// Shared signing material lives outside the repository.
+val signingProperties = Properties().apply {
+    val file = file("/home/andunie/android-release/signing.properties")
+    require(file.exists()) { "Missing signing config: ${file.path}" }
+    file.inputStream().use { load(it) }
 }
 
 android {
@@ -20,10 +29,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(signingProperties.getProperty("storeFile"))
+            storePassword = signingProperties.getProperty("storePassword")
+            keyAlias = signingProperties.getProperty("keyAlias")
+            keyPassword = signingProperties.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -45,7 +66,7 @@ tasks.register<Exec>("buildRustLibrary") {
     environment("ANDROID_HOME", androidHome)
     environment("ANDROID_JAR", "$androidHome/platforms/android-36/android.jar")
     commandLine("cargo", "ndk",
-        "-o", "AndroidApp/app/src/main/jniLibs/",
+        "-o", "android/app/src/main/jniLibs/",
         "-t", "arm64-v8a",
         "-t", "x86_64-linux-android",
         "--platform", "31",
