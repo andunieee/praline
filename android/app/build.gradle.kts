@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.caskade.wallet"
-        minSdk = 31
+        minSdk = 24
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -69,7 +69,7 @@ tasks.register<Exec>("buildRustLibrary") {
         "-o", "android/app/src/main/jniLibs/",
         "-t", "arm64-v8a",
         "-t", "x86_64-linux-android",
-        "--platform", "31",
+        "--platform", "24",
         "build", "--lib", "--release")
 }
 
