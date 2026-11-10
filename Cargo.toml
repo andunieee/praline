@@ -1,0 +1,33 @@
+[package]
+name = "caskade"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+freya = { git = "https://github.com/marc2332/freya", rev = "e506b09328e52cc0ab10d0adbef7dbd3ce0f063e", features = [
+  "router",
+  "material-design",
+  "icons-lucide",
+] }
+freya-winit = { git = "https://github.com/marc2332/freya", rev = "e506b09328e52cc0ab10d0adbef7dbd3ce0f063e" }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+fastrand = "2"
+async-io = "2"
+log = "0.4"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+env_logger = "0.11"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15"
+winit = { version = "0.30.12", features = ["android-native-activity", "rwh_06"] }
+
+[lib]
+name = "caskade"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "caskade"
+path = "src/main.rs"
