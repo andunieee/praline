@@ -5,12 +5,12 @@ edition = "2024"
 publish = false
 
 [dependencies]
-freya = { git = "https://github.com/marc2332/freya", rev = "e506b09328e52cc0ab10d0adbef7dbd3ce0f063e", features = [
+freya = { path = "../freya/crates/freya", features = [
   "router",
   "material-design",
   "icons-lucide",
 ] }
-freya-winit = { git = "https://github.com/marc2332/freya", rev = "e506b09328e52cc0ab10d0adbef7dbd3ce0f063e" }
+freya-winit = { path = "../freya/crates/freya-winit" }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 fastrand = "2"
 async-io = "2"
