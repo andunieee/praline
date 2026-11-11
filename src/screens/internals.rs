@@ -151,21 +151,21 @@ fn utxo_row(utxo: &Utxo, unit: crate::state::Unit) -> Rect {
                 .child(confirmations),
         )
         .child(
-            label()
+            SelectableText::new()
                 .font_size(12.)
                 .font_family("monospace")
                 .color(colors.text_secondary)
-                .text(utxo.outpoint.clone()),
+                .span(utxo.outpoint.clone()),
         )
         .child(
-            label()
+            SelectableText::new()
                 .width(Size::fill())
                 .font_size(12.)
                 .font_family("monospace")
                 .color(colors.text_secondary)
                 .max_lines(1)
                 .text_overflow(TextOverflow::Ellipsis)
-                .text(utxo.address),
+                .span(utxo.address),
         )
 }
 

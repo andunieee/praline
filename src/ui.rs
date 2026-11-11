@@ -89,6 +89,7 @@ pub fn section(title: &'static str, content: impl Into<Element>) -> Rect {
 
 pub fn kv_row(key: impl Into<String>, value: impl Into<String>) -> Rect {
     let colors = palette();
+    let value = value.into();
     rect()
         .horizontal()
         .width(Size::fill())
@@ -101,12 +102,12 @@ pub fn kv_row(key: impl Into<String>, value: impl Into<String>) -> Rect {
                 .text(key.into()),
         )
         .child(
-            label()
+            SelectableText::new()
                 .width(Size::flex(1.))
                 .text_align(TextAlign::End)
                 .max_lines(1)
                 .text_overflow(TextOverflow::Ellipsis)
-                .text(value.into()),
+                .span(value),
         )
 }
 

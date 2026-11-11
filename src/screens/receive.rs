@@ -267,6 +267,7 @@ impl Component for InvoiceView {
                             .background(colors.surface_secondary)
                             .on_press(move |_| {
                                 let _ = Clipboard::set(invoice.clone());
+                                let _ = Clipboard::set_primary(invoice.clone());
                                 copied.set(true);
                             })
                             .child(
