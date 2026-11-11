@@ -1,4 +1,5 @@
 mod app;
+mod insets;
 mod mock;
 mod screens;
 mod state;
@@ -31,6 +32,8 @@ fn android_main(droid_app: winit::platform::android::activity::AndroidApp) {
         .with_android_app(droid_app.clone())
         .build()
         .expect("Failed to build event loop");
+
+    crate::insets::install_proxy(event_loop.create_proxy());
 
     launch(
         LaunchConfig::new()

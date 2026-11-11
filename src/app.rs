@@ -14,13 +14,13 @@ use crate::{
     },
 };
 
-/// Space reserved for the Android status bar and gesture area.
-const TOP_INSET: f32 = if cfg!(target_os = "android") { 36. } else { 0. };
-const BOTTOM_INSET: f32 = if cfg!(target_os = "android") { 20. } else { 6. };
+/// Extra breathing room under the nav tabs. On Android the system bar insets are
+/// applied as padding on the root element, so no extra space is needed.
+const BOTTOM_INSET: f32 = if cfg!(target_os = "android") { 0. } else { 6. };
 
 pub fn wallet_theme(dark: bool) -> Theme {
     let mut theme = if dark { dark_theme() } else { light_theme() };
-    theme.name = if dark { "wallet-dark" } else { "wallet-light" };
+    theme.name = if dark { "dark" } else { "light" };
     theme.colors = if dark {
         ColorsSheet {
             primary: ACCENT,
@@ -84,6 +84,7 @@ struct Shell;
 impl Component for Shell {
     fn render(&self) -> impl IntoElement {
         let colors = palette();
+        let insets = crate::insets::use_insets();
 
         rect()
             .native_router()
@@ -91,7 +92,7 @@ impl Component for Shell {
             .content(Content::flex())
             .theme_background()
             .theme_color()
-            .padding((TOP_INSET, 0., 0., 0.))
+            .padding((insets.top, insets.right, insets.bottom, insets.left))
             .child(
                 rect()
                     .width(Size::fill())
