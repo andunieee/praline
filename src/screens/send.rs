@@ -35,6 +35,18 @@ impl Component for SendScreen {
         let colors = palette();
         let has_manual = !manual.read().trim().is_empty();
 
+        #[cfg(target_os = "android")]
+        {
+            let mut scan = crate::scanner::use_scan_result();
+            use_side_effect(move || {
+                let scanned = scan.read().clone();
+                if let Some(contents) = scanned {
+                    scan.set(None);
+                    open_invoice(&contents);
+                }
+            });
+        }
+
         ScrollView::new()
             .width(Size::fill())
             .height(Size::fill())
@@ -50,7 +62,11 @@ impl Component for SendScreen {
                         label()
                             .font_size(13.)
                             .color(colors.text_secondary)
-                            .text("Camera not wired up yet. Tap the viewfinder to fake a scan."),
+                            .text(if cfg!(target_os = "android") {
+                                "Point the camera at a QR code."
+                            } else {
+                                "Camera not wired up yet. Tap the viewfinder to fake a scan."
+                            }),
                     )
                     .child(
                         Button::new()
@@ -135,7 +151,12 @@ impl Component for Scanner {
                     .stop(((8, 8, 10), 100.)),
             )
             .center()
-            .on_press(|_| open_invoice(&mock::mock_clipboard_invoice()))
+            .on_press(|_| {
+                #[cfg(target_os = "android")]
+                crate::scanner::start();
+                #[cfg(not(target_os = "android"))]
+                open_invoice(&mock::mock_clipboard_invoice());
+            })
             .child(icon(lucide::qr_code(), 72., Color::from_af32rgb(0.15, 255, 255, 255)))
             .child(corner(true, true))
             .child(corner(true, false))

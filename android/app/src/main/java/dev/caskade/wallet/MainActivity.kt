@@ -1,6 +1,7 @@
 package dev.caskade.wallet
 
 import android.app.NativeActivity
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
@@ -11,6 +12,7 @@ import android.view.ViewGroup
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.zxing.integration.android.IntentIntegrator
 
 private const val APP_BACKGROUND = 0xFF0D0D10.toInt()
 
@@ -73,4 +75,27 @@ class MainActivity : NativeActivity() {
     }
 
     private external fun nativeSetInsets(left: Float, top: Float, right: Float, bottom: Float)
+
+    /** Opens the embedded ZXing scanner. Called from Rust on the Java main thread. */
+    @Suppress("DEPRECATION")
+    fun startScanner() {
+        IntentIntegrator(this)
+            .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+            .setPrompt("Scan a Lightning invoice")
+            .setBeepEnabled(false)
+            .setOrientationLocked(false)
+            .initiateScan()
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data) ?: return
+        result.contents
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::nativeOnQrScanned)
+    }
+
+    private external fun nativeOnQrScanned(contents: String)
 }

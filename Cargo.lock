@@ -765,6 +765,7 @@ dependencies = [
  "fastrand",
  "freya",
  "freya-winit",
+ "jni",
  "log",
  "qrcode",
  "winit",

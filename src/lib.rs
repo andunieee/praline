@@ -1,6 +1,10 @@
+#[cfg(target_os = "android")]
+mod android;
 mod app;
 mod insets;
 mod mock;
+#[cfg(target_os = "android")]
+mod scanner;
 mod screens;
 mod state;
 mod ui;
@@ -33,7 +37,7 @@ fn android_main(droid_app: winit::platform::android::activity::AndroidApp) {
         .build()
         .expect("Failed to build event loop");
 
-    crate::insets::install_proxy(event_loop.create_proxy());
+    crate::android::install_proxy(event_loop.create_proxy());
 
     launch(
         LaunchConfig::new()

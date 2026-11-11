@@ -24,23 +24,17 @@ mod platform {
     use std::{
         cell::Cell,
         ffi::c_void,
-        sync::{
-            OnceLock,
-            atomic::{
-                AtomicU32,
-                Ordering,
-            },
+        sync::atomic::{
+            AtomicU32,
+            Ordering,
         },
     };
 
     use freya::prelude::{
-        LaunchProxy,
         State,
         WritableUtils,
         use_state,
     };
-    use freya_winit::renderer::NativeEvent;
-    use winit::event_loop::EventLoopProxy;
 
     use super::Insets;
 
@@ -49,14 +43,8 @@ mod platform {
     static RIGHT: AtomicU32 = AtomicU32::new(0);
     static BOTTOM: AtomicU32 = AtomicU32::new(0);
 
-    static PROXY: OnceLock<EventLoopProxy<NativeEvent>> = OnceLock::new();
-
     thread_local! {
         static STATE: Cell<Option<State<Insets>>> = const { Cell::new(None) };
-    }
-
-    pub fn install_proxy(proxy: EventLoopProxy<NativeEvent>) {
-        let _ = PROXY.set(proxy);
     }
 
     pub fn use_insets() -> Insets {
@@ -104,20 +92,15 @@ mod platform {
 
         // Freya state is single threaded, so hop onto the renderer thread
         // before applying the new insets.
-        if let Some(proxy) = PROXY.get() {
-            let _ = LaunchProxy(proxy.clone()).post_callback(move |_| {
-                STATE.with(|cell| {
-                    if let Some(mut state) = cell.get() {
-                        state.set(insets);
-                    }
-                });
+        crate::android::post_to_ui(move |_| {
+            STATE.with(|cell| {
+                if let Some(mut state) = cell.get() {
+                    state.set(insets);
+                }
             });
-        }
+        });
     }
 }
 
 #[cfg(target_os = "android")]
-pub use platform::{
-    install_proxy,
-    use_insets,
-};
+pub use platform::use_insets;

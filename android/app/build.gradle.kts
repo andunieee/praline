@@ -86,4 +86,5 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.androidx.startup.runtime)
+    implementation(libs.zxing.android.embedded)
 }
