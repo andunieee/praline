@@ -23,7 +23,7 @@ use crate::{
     },
 };
 
-pub const ACCENT: Color = Color::from_rgb(247, 147, 26);
+pub const ACCENT: Color = Color::from_rgb(201, 138, 84);
 pub const POSITIVE: Color = Color::from_rgb(76, 200, 120);
 pub const NEGATIVE: Color = Color::from_rgb(235, 95, 95);
 
@@ -439,7 +439,13 @@ impl Component for TxRow {
                             .horizontal()
                             .spacing(8.)
                             .cross_align(Alignment::center())
-                            .child(pill(tx.kind.label(), tint))
+                            .child(
+                                label()
+                                    .font_size(12.)
+                                    .font_weight(FontWeight::BOLD)
+                                    .color(tint)
+                                    .text(tx.kind.label()),
+                            )
                             .maybe_child(status),
                     )
                     .child(

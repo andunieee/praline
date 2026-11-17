@@ -1,5 +1,4 @@
 use freya::{
-    icons::lucide,
     prelude::*,
     router::RouterContext,
 };
@@ -112,19 +111,17 @@ struct Header {
 impl Component for Header {
     fn render(&self) -> impl IntoElement {
         let colors = palette();
-        let action = |glyph: fn() -> Bytes, name: &'static str, route: Route| {
+        let action = |name: &'static str, route: Route| {
             rect()
                 .width(Size::flex(1.))
-                .padding((12., 4.))
-                .spacing(6.)
+                .padding((16., 4.))
                 .center()
                 .corner_radius(16.)
                 .background(colors.surface_secondary)
                 .on_press(move |_| {
                     let _ = RouterContext::get().push(route.clone());
                 })
-                .child(icon(glyph(), 22., ACCENT))
-                .child(label().font_size(12.).text(name))
+                .child(label().font_size(14.).font_weight(FontWeight::BOLD).text(name))
         };
         rect()
             .width(Size::fill())
@@ -149,10 +146,7 @@ impl Component for Header {
                             .font_size(12.)
                             .color(colors.text_secondary)
                             .text(self.mint.url.clone()),
-                    )
-                    .maybe(self.mint.cassis, |el| {
-                        el.child(pill("Payable with Cassis", POSITIVE))
-                    }),
+                    ),
             )
             .child(
                 rect()
@@ -160,10 +154,10 @@ impl Component for Header {
                     .width(Size::fill())
                     .content(Content::flex())
                     .spacing(8.)
-                    .child(action(lucide::zap, "Deposit", Route::Deposit))
-                    .child(action(lucide::arrow_up_right, "Withdraw", Route::Withdraw))
-                    .child(action(lucide::send, "Send token", Route::SendToken))
-                    .child(action(lucide::download, "Redeem", Route::ReceiveToken)),
+                    .child(action("Deposit", Route::Deposit))
+                    .child(action("Withdraw", Route::Withdraw))
+                    .child(action("Send token", Route::SendToken))
+                    .child(action("Redeem", Route::ReceiveToken)),
             )
     }
 }

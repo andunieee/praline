@@ -33,27 +33,27 @@ pub fn wallet_theme(dark: bool) -> Theme {
     theme.colors = if dark {
         ColorsSheet {
             primary: ACCENT,
-            secondary: Color::from_rgb(120, 72, 14),
-            tertiary: Color::from_rgb(200, 110, 10),
-            background: Color::from_rgb(13, 13, 16),
-            surface_primary: Color::from_rgb(44, 44, 52),
-            surface_secondary: Color::from_rgb(30, 30, 36),
-            surface_tertiary: Color::from_rgb(22, 22, 27),
-            border: Color::from_rgb(42, 42, 50),
-            text_secondary: Color::from_rgb(150, 150, 162),
+            secondary: Color::from_rgb(110, 70, 48),
+            tertiary: Color::from_rgb(160, 104, 64),
+            background: Color::from_rgb(20, 14, 12),
+            surface_primary: Color::from_rgb(54, 40, 35),
+            surface_secondary: Color::from_rgb(34, 25, 22),
+            surface_tertiary: Color::from_rgb(27, 19, 17),
+            border: Color::from_rgb(56, 42, 37),
+            text_secondary: Color::from_rgb(168, 150, 140),
             text_highlight: ACCENT,
             ..DARK_COLORS
         }
     } else {
         ColorsSheet {
             primary: ACCENT,
-            secondary: Color::from_rgb(120, 72, 14),
-            tertiary: Color::from_rgb(200, 110, 10),
-            background: Color::from_rgb(246, 246, 248),
-            surface_primary: Color::from_rgb(225, 225, 232),
+            secondary: Color::from_rgb(110, 70, 48),
+            tertiary: Color::from_rgb(160, 104, 64),
+            background: Color::from_rgb(248, 242, 236),
+            surface_primary: Color::from_rgb(232, 220, 210),
             surface_secondary: Color::WHITE,
-            surface_tertiary: Color::from_rgb(238, 238, 242),
-            text_secondary: Color::from_rgb(105, 105, 118),
+            surface_tertiary: Color::from_rgb(240, 230, 221),
+            text_secondary: Color::from_rgb(122, 100, 88),
             text_highlight: ACCENT,
             ..LIGHT_COLORS
         }

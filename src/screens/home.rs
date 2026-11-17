@@ -32,12 +32,10 @@ impl Component for HomeScreen {
 
         let body: Element = match &*mints.state() {
             FutureState::Fulfilled(Ok(list)) => {
-                let total: u64 = list.iter().map(|m| m.balance_sat).sum();
                 let hidden = settings.read().hide_balance;
                 rect()
                     .width(Size::fill())
                     .spacing(20.)
-                    .child(BalanceCard { total, hidden })
                     .child(
                         rect()
                             .width(Size::fill())
@@ -91,66 +89,12 @@ fn top_bar() -> Rect {
         .padding((14., 0., 0., 0.))
         .cross_align(Alignment::center())
         .spacing(10.)
-        .child(icon_badge(lucide::wallet(), 36., Color::WHITE, ACCENT))
         .child(
             label()
                 .font_size(22.)
                 .font_weight(FontWeight::BOLD)
                 .text("Praline"),
         )
-}
-
-#[derive(PartialEq)]
-struct BalanceCard {
-    total: u64,
-    hidden: bool,
-}
-
-impl Component for BalanceCard {
-    fn render(&self) -> impl IntoElement {
-        let mut settings = use_settings();
-        let colors = palette();
-        let hidden = self.hidden;
-        rect()
-            .width(Size::fill())
-            .padding(20.)
-            .spacing(6.)
-            .corner_radius(24.)
-            .background(
-                LinearGradient::new()
-                    .angle(135.)
-                    .stop(((247, 147, 26), 0.))
-                    .stop(((200, 100, 10), 100.)),
-            )
-            .on_press(move |_| settings.write().hide_balance = !hidden)
-            .child(
-                label()
-                    .font_size(13.)
-                    .color(Color::WHITE.with_a(200))
-                    .text("Total balance"),
-            )
-            .child(
-                label()
-                    .font_size(34.)
-                    .font_weight(FontWeight::BOLD)
-                    .color(Color::WHITE)
-                    .text(if hidden {
-                        "••••••".to_owned()
-                    } else {
-                        fmt::sats(self.total)
-                    }),
-            )
-            .child(
-                label()
-                    .font_size(12.)
-                    .color(colors.text_inverse.with_a(180))
-                    .text(if hidden {
-                        "Tap to show"
-                    } else {
-                        "Across all mints · tap to hide"
-                    }),
-            )
-    }
 }
 
 #[derive(PartialEq)]
@@ -201,8 +145,7 @@ impl Component for MintRow {
                             .max_lines(1)
                             .text_overflow(TextOverflow::Ellipsis)
                             .text(mint.url.clone()),
-                    )
-                    .maybe(mint.cassis, |el| el.child(pill("Cassis", POSITIVE))),
+                    ),
             )
             .child(
                 label()
