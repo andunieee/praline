@@ -70,7 +70,7 @@ fn deliver(contents: String) {
 
 /// Called by `MainActivity` with the contents of a scanned QR code.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_dev_caskade_wallet_MainActivity_nativeOnQrScanned(
+pub extern "system" fn Java_dev_praline_wallet_MainActivity_nativeOnQrScanned(
     mut unowned_env: EnvUnowned<'_>,
     _this: JObject<'_>,
     contents: JString<'_>,

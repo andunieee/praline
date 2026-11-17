@@ -74,7 +74,7 @@ mod platform {
     /// Called from `MainActivity` on the Java main thread whenever the window
     /// insets change. The values are in logical pixels already.
     #[unsafe(no_mangle)]
-    pub extern "system" fn Java_dev_caskade_wallet_MainActivity_nativeSetInsets(
+    pub extern "system" fn Java_dev_praline_wallet_MainActivity_nativeSetInsets(
         _env: *mut c_void,
         _this: *mut c_void,
         left: f32,

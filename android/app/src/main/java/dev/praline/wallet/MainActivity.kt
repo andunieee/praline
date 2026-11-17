@@ -1,4 +1,4 @@
-package dev.caskade.wallet
+package dev.praline.wallet
 
 import android.app.NativeActivity
 import android.content.Intent
@@ -34,7 +34,7 @@ class MainActivity : NativeActivity() {
 
         // NativeActivity loads the library with dlopen, which the JVM does not
         // know about. Register it so `nativeSetInsets` can be resolved.
-        System.loadLibrary("caskade")
+        System.loadLibrary("praline")
 
         // Edge-to-edge. NativeActivity hands the native window the whole
         // surface, so the insets are sent to Rust and applied as UI padding.

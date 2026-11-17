@@ -1,5 +1,5 @@
 [package]
-name = "caskade"
+name = "praline"
 version = "0.1.0"
 edition = "2024"
 publish = false
@@ -43,12 +43,12 @@ jni = "0.22"
 winit = { version = "0.30.12", features = ["android-native-activity", "rwh_06"] }
 
 [lib]
-name = "caskade"
+name = "praline"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "caskade"
+name = "praline"
 path = "src/main.rs"
 
 # freya-cop from crates.io must share the local freya (Linux primary clipboard) and hypereffect

@@ -1286,40 +1286,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "caskade"
-version = "0.1.0"
-dependencies = [
- "android_logger",
- "async-channel",
- "async-io",
- "async-trait",
- "bip39",
- "bitcoin",
- "cassis-core",
- "cassis-networks",
- "cassis-wallet",
- "cdk",
- "env_logger",
- "fastrand",
- "freya",
- "freya-cop",
- "freya-hypereffect",
- "freya-winit",
- "hypereffect",
- "jni 0.22.4",
- "log",
- "lowercase-hex",
- "orangedb",
- "qrcode",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
- "winit",
-]
-
-[[package]]
 name = "cassis-cashu"
 version = "0.1.0"
 dependencies = [
@@ -6336,6 +6302,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "praline"
+version = "0.1.0"
+dependencies = [
+ "android_logger",
+ "async-channel",
+ "async-io",
+ "async-trait",
+ "bip39",
+ "bitcoin",
+ "cassis-core",
+ "cassis-networks",
+ "cassis-wallet",
+ "cdk",
+ "env_logger",
+ "fastrand",
+ "freya",
+ "freya-cop",
+ "freya-hypereffect",
+ "freya-winit",
+ "hypereffect",
+ "jni 0.22.4",
+ "log",
+ "lowercase-hex",
+ "orangedb",
+ "qrcode",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+ "winit",
 ]
 
 [[package]]

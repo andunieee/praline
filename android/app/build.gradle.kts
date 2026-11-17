@@ -12,7 +12,7 @@ val signingProperties = Properties().apply {
 }
 
 android {
-    namespace = "dev.caskade.wallet"
+    namespace = "dev.praline.wallet"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "dev.caskade.wallet"
+        applicationId = "dev.praline.wallet"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

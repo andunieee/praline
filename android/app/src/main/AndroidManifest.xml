@@ -12,7 +12,7 @@
     <application
         android:hasCode="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Caskade"
+        android:label="Praline"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.NoActionBar">
@@ -27,7 +27,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.app.lib_name"
-                android:value="caskade" />
+                android:value="praline" />
         </activity>
 
         <provider

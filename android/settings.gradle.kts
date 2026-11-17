@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Caskade"
+rootProject.name = "Praline"
 include(":app")
  
