@@ -1,13 +1,19 @@
+mod deposit;
 mod home;
-mod internals;
+mod mint;
+mod order;
 mod pay;
-mod receive;
-mod send;
 mod settings;
+mod token;
+mod transactions;
+mod withdraw;
 
+pub use deposit::*;
 pub use home::*;
-pub use internals::*;
+pub use mint::*;
+pub use order::*;
 pub use pay::*;
-pub use receive::*;
-pub use send::*;
 pub use settings::*;
+pub use token::*;
+pub use transactions::*;
+pub use withdraw::*;

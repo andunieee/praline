@@ -5,12 +5,21 @@ use freya::{
 };
 
 use crate::{
+    engine::Engine,
     screens::*,
-    state::Settings,
+    state::{
+        PendingFlow,
+        PendingInvoice,
+        Refresh,
+        SelectedMint,
+        Settings,
+    },
     ui::{
         ACCENT,
         icon,
+        notice,
         palette,
+        NEGATIVE,
     },
 };
 
@@ -52,12 +61,70 @@ pub fn wallet_theme(dark: bool) -> Theme {
     theme
 }
 
+/// Where the wallet keeps its files.
+fn data_dir() -> std::path::PathBuf {
+    #[cfg(target_os = "android")]
+    {
+        use freya::prelude::GlobalContexts;
+        use winit::platform::android::activity::AndroidApp;
+        if let Some(dir) = GlobalContexts::get()
+            .try_get_context::<AndroidApp>()
+            .and_then(|app| app.internal_data_path())
+        {
+            return dir;
+        }
+    }
+    dirs_next()
+}
+
+#[cfg(not(target_os = "android"))]
+fn dirs_next() -> std::path::PathBuf {
+    std::env::var_os("PRALINE_HOME")
+        .map(Into::into)
+        .or_else(|| {
+            std::env::var_os("XDG_DATA_HOME")
+                .map(|d| std::path::PathBuf::from(d).join("praline"))
+        })
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(|d| std::path::PathBuf::from(d).join(".local/share/praline"))
+        })
+        .unwrap_or_else(|| std::path::PathBuf::from("praline-data"))
+}
+
+#[cfg(target_os = "android")]
+fn dirs_next() -> std::path::PathBuf {
+    std::path::PathBuf::from("praline-data")
+}
+
 pub fn app() -> impl IntoElement {
     use_init_theme(|| wallet_theme(true));
     let settings = use_state(Settings::default);
     use_provide_context(move || settings);
+    let selected = use_state(|| None::<String>);
+    use_provide_context(move || SelectedMint(selected));
+    let flow = use_state(|| None);
+    use_provide_context(move || PendingFlow(flow));
+    let invoice = use_state(|| None::<String>);
+    use_provide_context(move || PendingInvoice(invoice));
+    let refresh = use_state(|| 0u64);
+    use_provide_context(move || Refresh(refresh));
 
-    Router::<Route>::new(RouterConfig::default)
+    // Opening the wallet takes the database and the node; it happens once, with the first frame.
+    let engine = use_hook(|| Engine::start(&data_dir()));
+    match engine {
+        Ok(engine) => {
+            use_provide_context(move || engine.clone());
+            Router::<Route>::new(RouterConfig::default).into_element()
+        }
+        Err(error) => rect()
+            .expanded()
+            .theme_background()
+            .padding(24.)
+            .center()
+            .child(notice(format!("The wallet could not start: {error}"), NEGATIVE))
+            .into_element(),
+    }
 }
 
 #[derive(Routable, Clone, PartialEq)]
@@ -66,14 +133,22 @@ pub enum Route {
     #[layout(Shell)]
         #[route("/", HomeScreen)]
         Home,
-        #[route("/send", SendScreen)]
-        Send,
-        #[route("/pay/:invoice", PayScreen)]
-        Pay { invoice: String },
-        #[route("/receive", ReceiveScreen)]
-        Receive,
-        #[route("/internals", InternalsScreen)]
-        Internals,
+        #[route("/mint", MintScreen)]
+        Mint,
+        #[route("/mint/deposit", DepositScreen)]
+        Deposit,
+        #[route("/mint/withdraw", WithdrawScreen)]
+        Withdraw,
+        #[route("/mint/send", SendTokenScreen)]
+        SendToken,
+        #[route("/mint/receive", ReceiveTokenScreen)]
+        ReceiveToken,
+        #[route("/transactions", TransactionsScreen)]
+        Transactions,
+        #[route("/pay", PayScreen)]
+        Pay,
+        #[route("/order", OrderScreen)]
+        Order,
         #[route("/settings", SettingsScreen)]
         Settings,
 }
@@ -116,8 +191,8 @@ impl Component for Shell {
                             .alignment(BorderAlignment::Inner),
                     )
                     .child(NavTab::new(Route::Home, "Wallet", lucide::wallet))
-                    .child(NavTab::new(Route::Receive, "Receive", lucide::qr_code))
-                    .child(NavTab::new(Route::Internals, "Internals", lucide::cpu))
+                    .child(NavTab::new(Route::Transactions, "Activity", lucide::list))
+                    .child(NavTab::new(Route::Pay, "Pay", lucide::qr_code))
                     .child(NavTab::new(Route::Settings, "Settings", lucide::settings)),
             )
     }
@@ -146,7 +221,15 @@ impl Component for NavTab {
         let colors = palette();
 
         let active = match (&self.route, &current) {
-            (Route::Home, Route::Send | Route::Pay { .. }) => true,
+            (
+                Route::Home,
+                Route::Mint
+                | Route::Deposit
+                | Route::Withdraw
+                | Route::SendToken
+                | Route::ReceiveToken,
+            ) => true,
+            (Route::Pay, Route::Order) => true,
             (a, b) => a == b,
         };
         let color = if active {

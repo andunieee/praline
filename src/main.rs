@@ -9,7 +9,7 @@ fn main() {
     launch(
         LaunchConfig::new().with_window(
             WindowConfig::new(caskade::app)
-                .with_title("Caskade")
+                .with_title("Praline")
                 .with_size(420., 820.),
         ),
     )
