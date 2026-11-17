@@ -1305,7 +1305,7 @@ dependencies = [
  "freya-cop",
  "freya-hypereffect",
  "freya-winit",
- "hypereffect 0.6.2",
+ "hypereffect",
  "jni 0.22.4",
  "log",
  "lowercase-hex",
@@ -1381,7 +1381,7 @@ dependencies = [
  "cassis-networks",
  "clap",
  "futures",
- "hypereffect 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hypereffect",
  "iroh",
  "iroh-base",
  "lowercase-hex",
@@ -2809,12 +2809,14 @@ dependencies = [
 [[package]]
 name = "freya-cop"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13c9b6940999af48e41eae92e8245ef8176c6b20516d2a9731372a80f2d8c816"
 dependencies = [
  "async-channel",
  "base64 0.22.1",
  "freya",
  "freya-hypereffect",
- "hypereffect 0.6.2",
+ "hypereffect",
  "iroh",
  "rand 0.8.8",
  "reqwest 0.12.28",
@@ -2880,7 +2882,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "freya",
- "hypereffect 0.6.2",
+ "hypereffect",
 ]
 
 [[package]]
@@ -3729,18 +3731,7 @@ dependencies = [
 
 [[package]]
 name = "hypereffect"
-version = "0.6.2"
-dependencies = [
- "cel",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "hypereffect"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2035ba584ee27600455f34d05d40cc08578732fe50da5d1cb7bc32b9f15dee88"
+version = "0.6.3"
 dependencies = [
  "cel",
  "serde",

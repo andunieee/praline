@@ -17,7 +17,7 @@ async-io = "2"
 async-channel = "2"
 log = "0.4"
 freya-hypereffect = { path = "../freya-hypereffect" }
-freya-cop = { path = "../freya-cop" }
+freya-cop = "0.1.0"
 hypereffect = { path = "../hypereffect/rust/hypereffect" }
 cassis-core = { path = "../cassis/cassis-core" }
 cassis-networks = { path = "../cassis/cassis-networks", features = ["cashu"] }
@@ -50,3 +50,27 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "caskade"
 path = "src/main.rs"
+
+# freya-cop from crates.io must share the local freya (Linux primary clipboard) and hypereffect
+[patch.crates-io]
+freya = { path = "../freya/crates/freya" }
+freya-core = { path = "../freya/crates/freya-core" }
+freya-components = { path = "../freya/crates/freya-components" }
+freya-winit = { path = "../freya/crates/freya-winit" }
+freya-clipboard = { path = "../freya/crates/freya-clipboard" }
+freya-edit = { path = "../freya/crates/freya-edit" }
+freya-engine = { path = "../freya/crates/freya-engine" }
+freya-icons = { path = "../freya/crates/freya-icons" }
+freya-router = { path = "../freya/crates/freya-router" }
+freya-material-design = { path = "../freya/crates/freya-material-design" }
+freya-animation = { path = "../freya/crates/freya-animation" }
+freya-sdk = { path = "../freya/crates/freya-sdk" }
+freya-android = { path = "../freya/crates/freya-android" }
+torin = { path = "../freya/crates/torin" }
+ragnarok = { path = "../freya/crates/ragnarok" }
+tiny-cache = { path = "../freya/crates/tiny-cache" }
+tiny-diff = { path = "../freya/crates/tiny-diff" }
+tiny-notify = { path = "../freya/crates/tiny-notify" }
+pathgraph = { path = "../freya/crates/pathgraph" }
+freya-hypereffect = { path = "../freya-hypereffect" }
+hypereffect = { path = "../hypereffect/rust/hypereffect" }
