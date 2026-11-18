@@ -143,19 +143,17 @@ impl Engine {
             serde_json::from_value(invoice).map_err(|e| format!("not a Cassis invoice: {e}"))?;
         invoice.verify()?;
         let amount_sat = sats_ceil(invoice.body.amount_msat);
+        // Any mint on Cassis can pay: if the invoice is not on its network, the payment is routed.
+        let urls: Vec<String> = self
+            .0
+            .adapters
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .keys()
+            .cloned()
+            .collect();
         let mut options = Vec::new();
-        for network in &invoice.body.networks {
-            let id = network.target.network();
-            if id.kind() != "cashu" {
-                continue;
-            }
-            let Ok(url) = cassis_networks::cashu::mint_url(id) else {
-                continue;
-            };
-            let url = url.trim_end_matches('/').to_owned();
-            if self.adapter(&url).is_none() {
-                continue;
-            }
+        for url in urls {
             let summary = self.mint_summary(&url).await?;
             options.push(PayOption {
                 enough: summary.balance_sat >= amount_sat + fee_room(amount_sat),

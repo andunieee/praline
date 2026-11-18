@@ -330,7 +330,7 @@ impl Component for PayCard {
             )
             .child(if options.is_empty() {
                 notice(
-                    "None of your mints can pay this. Add a mint on one of the invoice's networks.",
+                    "You have no mint to pay this from. Add a mint first.",
                     NEGATIVE,
                 )
                 .into_element()
