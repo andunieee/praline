@@ -22,7 +22,7 @@ use cdk::wallet::Wallet;
 use store::{CdkStore, Db};
 
 pub use cassis::PaymentOffer;
-pub use mints::{Deposit, MintSummary, Withdrawal};
+pub use mints::{Deposit, MintSummary, OnchainDeposit, OnchainOption, Withdrawal};
 pub use transactions::{TxKind, TxStatus, TxView};
 
 /// The memo of the tokens the wallet sends itself, between its cdk wallet and the Cassis

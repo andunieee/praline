@@ -139,6 +139,10 @@ pub enum Route {
         Deposit,
         #[route("/mint/withdraw", WithdrawScreen)]
         Withdraw,
+        #[route("/mint/onchain-deposit", OnchainDepositScreen)]
+        OnchainDeposit,
+        #[route("/mint/onchain-withdraw", OnchainWithdrawScreen)]
+        OnchainWithdraw,
         #[route("/mint/send", SendTokenScreen)]
         SendToken,
         #[route("/mint/receive", ReceiveTokenScreen)]
@@ -226,6 +230,8 @@ impl Component for NavTab {
                 Route::Mint
                 | Route::Deposit
                 | Route::Withdraw
+                | Route::OnchainDeposit
+                | Route::OnchainWithdraw
                 | Route::SendToken
                 | Route::ReceiveToken,
             ) => true,

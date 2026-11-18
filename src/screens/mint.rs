@@ -150,16 +150,38 @@ impl Component for Header {
             )
             .child(
                 rect()
-                    .horizontal()
                     .width(Size::fill())
-                    .content(Content::flex())
                     .spacing(8.)
-                    .child(action("Deposit", Route::Deposit))
-                    .child(action("Withdraw", Route::Withdraw))
-                    .child(action("Send token", Route::SendToken))
-                    .child(action("Redeem", Route::ReceiveToken)),
+                    .child(row([
+                        Some(action("Lightning deposit", Route::Deposit)),
+                        Some(action("Lightning withdraw", Route::Withdraw)),
+                    ]))
+                    .maybe_child((self.mint.onchain_deposit || self.mint.onchain_withdraw).then(|| {
+                        row([
+                            self.mint
+                                .onchain_deposit
+                                .then(|| action("Onchain deposit", Route::OnchainDeposit)),
+                            self.mint
+                                .onchain_withdraw
+                                .then(|| action("Onchain withdraw", Route::OnchainWithdraw)),
+                        ])
+                    }))
+                    .child(row([
+                        Some(action("Send token", Route::SendToken)),
+                        Some(action("Redeem", Route::ReceiveToken)),
+                    ])),
             )
     }
+}
+
+/// A row of actions, each taking an equal share of the width.
+fn row(actions: impl IntoIterator<Item = Option<Rect>>) -> Rect {
+    rect()
+        .horizontal()
+        .width(Size::fill())
+        .content(Content::flex())
+        .spacing(8.)
+        .children(actions.into_iter().flatten().map(IntoElement::into_element))
 }
 
 #[derive(PartialEq)]

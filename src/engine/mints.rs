@@ -3,8 +3,8 @@ use std::{str::FromStr, sync::Arc};
 use cdk::{
     amount::SplitTarget,
     mint_url::MintUrl,
-    nuts::{CurrencyUnit, PaymentMethod, Token},
-    wallet::{ReceiveOptions, SendMemo, SendOptions, Wallet},
+    nuts::{nut00::KnownMethod, CurrencyUnit, PaymentMethod, Token},
+    wallet::{MeltOutcome, MeltQuote, ReceiveOptions, SendMemo, SendOptions, Wallet},
     Amount,
 };
 
@@ -20,6 +20,10 @@ pub struct MintSummary {
     pub balance_sat: u64,
     /// Whether payments can be made through it with Cassis (`cashu::<host>`).
     pub cassis: bool,
+    /// Whether the mint makes ecash from bitcoin sent to an address.
+    pub onchain_deposit: bool,
+    /// Whether the mint pays bitcoin addresses out of ecash.
+    pub onchain_withdraw: bool,
 }
 
 /// The URL of a mint as the wallet keeps it: with its scheme, and no trailing slash.
@@ -102,18 +106,33 @@ impl Engine {
     }
 
     pub(crate) async fn mint_summary(&self, url: &str) -> Result<MintSummary, String> {
-        let name = cdk::cdk_database::WalletDatabase::get_mint(
+        let info = cdk::cdk_database::WalletDatabase::get_mint(
             &self.0.store,
             MintUrl::from_str(url).map_err(|e| e.to_string())?,
         )
         .await
-        .map_err(|e| e.to_string())?
-        .and_then(|info| info.name)
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| host_of(url));
+        .map_err(|e| e.to_string())?;
+        let onchain = PaymentMethod::Known(KnownMethod::Onchain);
+        let supports = |deposit: bool| {
+            info.as_ref().is_some_and(|info| {
+                let unit = CurrencyUnit::Sat;
+                if deposit {
+                    !info.nuts.nut04.disabled && info.nuts.nut04.get_settings(&unit, &onchain).is_some()
+                } else {
+                    !info.nuts.nut05.disabled && info.nuts.nut05.get_settings(&unit, &onchain).is_some()
+                }
+            })
+        };
+        let (onchain_deposit, onchain_withdraw) = (supports(true), supports(false));
+        let name = info
+            .and_then(|info| info.name)
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| host_of(url));
         Ok(MintSummary {
             url: url.to_owned(),
             name,
+            onchain_deposit,
+            onchain_withdraw,
             balance_sat: self.balance(url).await?,
             cassis: self.adapter(url).is_some(),
         })
@@ -214,6 +233,109 @@ impl Engine {
                 .map_err(|e| e.to_string())?;
             let finalized = prepared.confirm().await.map_err(|e| e.to_string())?;
             Ok(u64::from(finalized.fee_paid()))
+        })
+        .await
+    }
+
+    /// Ask the mint for a bitcoin address that, once paid, becomes ecash in the wallet.
+    /// Returns the address and the quote to wait on with [`Engine::finish_onchain_deposit`].
+    pub async fn start_onchain_deposit(&self, url: &str) -> Result<OnchainDeposit, String> {
+        let (engine, url) = (self.clone(), url.to_owned());
+        self.run(async move {
+            let quote = engine
+                .wallet(&url)?
+                .mint_quote(PaymentMethod::Known(KnownMethod::Onchain), None, None, None)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(OnchainDeposit {
+                quote_id: quote.id,
+                address: quote.request,
+                expiry: quote.expiry,
+            })
+        })
+        .await
+    }
+
+    /// Wait for bitcoin to be confirmed at a deposit's address and take the ecash it makes.
+    /// Returns the sats.
+    pub async fn finish_onchain_deposit(&self, url: &str, quote_id: &str) -> Result<u64, String> {
+        let (engine, url, quote_id) = (self.clone(), url.to_owned(), quote_id.to_owned());
+        self.run(async move {
+            let wallet = engine.wallet(&url)?;
+            loop {
+                let quote = wallet
+                    .check_mint_quote_status(&quote_id)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                if u64::from(quote.amount_mintable()) > 0 {
+                    wallet
+                        .mint(&quote_id, SplitTarget::default(), None)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    return Ok(u64::from(quote.amount_mintable()));
+                }
+                if quote.expiry != 0 && quote.expiry < super::store::unix_now() {
+                    return Err("the address expired before any bitcoin was confirmed".into());
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+            }
+        })
+        .await
+    }
+
+    /// The ways the mint offers to pay `amount_sat` to a bitcoin address, one for each fee level.
+    pub async fn quote_onchain_withdrawal(
+        &self,
+        url: &str,
+        address: &str,
+        amount_sat: u64,
+    ) -> Result<Vec<OnchainOption>, String> {
+        let (engine, url, address) = (self.clone(), url.to_owned(), address.trim().to_owned());
+        self.run(async move {
+            engine.consolidate(&url).await;
+            let quotes = engine
+                .wallet(&url)?
+                .quote_onchain_melt_options(&address, Amount::from(amount_sat), None)
+                .await
+                .map_err(|e| e.to_string())?;
+            let mut options: Vec<_> = quotes
+                .into_iter()
+                .map(|quote| OnchainOption {
+                    amount_sat: u64::from(quote.amount),
+                    fee_reserve_sat: u64::from(quote.fee_reserve),
+                    estimated_blocks: quote.estimated_blocks,
+                    quote,
+                })
+                .collect();
+            options.sort_by_key(|o| o.fee_reserve_sat);
+            Ok(options)
+        })
+        .await
+    }
+
+    /// Pay to the address with the fee level of `option`. Returns the fee that was paid, or none
+    /// if the payment was sent but is not settled yet.
+    pub async fn confirm_onchain_withdrawal(
+        &self,
+        url: &str,
+        option: &OnchainOption,
+    ) -> Result<Option<u64>, String> {
+        let (engine, url, quote) = (self.clone(), url.to_owned(), option.quote.clone());
+        self.run(async move {
+            let wallet = engine.wallet(&url)?;
+            let quote_id = quote.id.clone();
+            wallet
+                .select_onchain_melt_quote(quote)
+                .await
+                .map_err(|e| e.to_string())?;
+            let prepared = wallet
+                .prepare_melt(&quote_id, Default::default())
+                .await
+                .map_err(|e| e.to_string())?;
+            match prepared.confirm_prefer_async().await.map_err(|e| e.to_string())? {
+                MeltOutcome::Paid(finalized) => Ok(Some(u64::from(finalized.fee_paid()))),
+                MeltOutcome::Pending(_) => Ok(None),
+            }
         })
         .await
     }
@@ -320,6 +442,26 @@ pub struct Deposit {
     /// The BOLT11 invoice to pay.
     pub invoice: String,
     pub expiry: u64,
+}
+
+/// A deposit waiting for bitcoin to arrive at its address.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OnchainDeposit {
+    pub quote_id: String,
+    pub address: String,
+    /// Zero if the address does not expire.
+    pub expiry: u64,
+}
+
+/// A bitcoin payment out of a mint, quoted at one fee level and not yet made.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OnchainOption {
+    pub amount_sat: u64,
+    /// The most the network fee can be; what is not used is returned.
+    pub fee_reserve_sat: u64,
+    /// How long the mint expects the payment to take to confirm.
+    pub estimated_blocks: Option<u32>,
+    quote: MeltQuote,
 }
 
 /// A Lightning payment out of a mint, quoted and not yet made.

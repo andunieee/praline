@@ -1,6 +1,8 @@
 mod deposit;
 mod home;
 mod mint;
+mod onchain_deposit;
+mod onchain_withdraw;
 mod order;
 mod pay;
 mod settings;
@@ -11,6 +13,8 @@ mod withdraw;
 pub use deposit::*;
 pub use home::*;
 pub use mint::*;
+pub use onchain_deposit::*;
+pub use onchain_withdraw::*;
 pub use order::*;
 pub use pay::*;
 pub use settings::*;

@@ -95,7 +95,10 @@ impl Engine {
                 }
                 let incoming = t.direction == TransactionDirection::Incoming;
                 let lightning = t.quote_id.is_some();
+                let onchain = t.payment_method.as_ref().is_some_and(|m| m.is_onchain());
                 let (kind, fallback) = match (incoming, lightning) {
+                    (true, true) if onchain => (TxKind::Deposit, "Onchain deposit"),
+                    (false, true) if onchain => (TxKind::Withdraw, "Onchain payment"),
                     (true, true) => (TxKind::Deposit, "Lightning deposit"),
                     (false, true) => (TxKind::Withdraw, "Lightning payment"),
                     (true, false) => (TxKind::TokenReceived, "Cashu token"),
