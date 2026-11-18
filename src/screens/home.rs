@@ -20,6 +20,7 @@ impl Component for HomeScreen {
         let engine = use_engine();
         let refresh = use_refresh();
         let settings = use_settings();
+        let mut adding = use_state(|| false);
 
         let mints = use_future({
             let engine = engine.clone();
@@ -41,11 +42,30 @@ impl Component for HomeScreen {
                             .width(Size::fill())
                             .spacing(8.)
                             .child(
-                                label()
-                                    .font_size(18.)
-                                    .font_weight(FontWeight::BOLD)
+                                rect()
+                                    .horizontal()
+                                    .width(Size::fill())
+                                    .content(Content::flex())
+                                    .cross_align(Alignment::center())
                                     .margin((0., 4.))
-                                    .text("Mints"),
+                                    .child(
+                                        label()
+                                            .width(Size::flex(1.))
+                                            .font_size(18.)
+                                            .font_weight(FontWeight::BOLD)
+                                            .text("Mints"),
+                                    )
+                                    .child(
+                                        rect()
+                                            .padding(6.)
+                                            .corner_radius(16.)
+                                            .on_press(move |_| adding.set(!adding()))
+                                            .child(icon(
+                                                if adding() { lucide::x() } else { lucide::plus() },
+                                                22.,
+                                                ACCENT,
+                                            )),
+                                    ),
                             )
                             .maybe(list.is_empty(), |el| {
                                 el.child(empty_state("Add a mint to start using the wallet."))
@@ -61,7 +81,7 @@ impl Component for HomeScreen {
                                     .into_element()
                             })),
                     )
-                    .child(AddMint)
+                    .maybe(adding(), |el| el.child(AddMint { adding }))
                     .into_element()
             }
             FutureState::Fulfilled(Err(error)) => notice(error.clone(), NEGATIVE).into_element(),
@@ -161,13 +181,16 @@ impl Component for MintRow {
 }
 
 #[derive(PartialEq)]
-struct AddMint;
+struct AddMint {
+    adding: State<bool>,
+}
 
 impl Component for AddMint {
     fn render(&self) -> impl IntoElement {
         let engine = use_engine();
         let refresh = use_refresh();
         let url = use_state(String::new);
+        let adding = self.adding;
         let mut busy = use_state(|| false);
         let mut error = use_state(|| None::<String>);
 
@@ -181,11 +204,12 @@ impl Component for AddMint {
                 busy.set(true);
                 error.set(None);
                 let engine = engine.clone();
-                let mut url = url;
+                let (mut url, mut adding) = (url, adding);
                 spawn(async move {
                     match engine.add_mint(&address).await {
                         Ok(_) => {
                             url.set(String::new());
+                            adding.set(false);
                             bump(refresh);
                         }
                         Err(e) => error.set(Some(e)),

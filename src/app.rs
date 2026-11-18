@@ -194,9 +194,9 @@ impl Component for Shell {
                             })
                             .alignment(BorderAlignment::Inner),
                     )
+                    .child(NavTab::new(Route::Pay, "Pay", lucide::qr_code))
                     .child(NavTab::new(Route::Home, "Wallet", lucide::wallet))
                     .child(NavTab::new(Route::Transactions, "Activity", lucide::list))
-                    .child(NavTab::new(Route::Pay, "Pay", lucide::qr_code))
                     .child(NavTab::new(Route::Settings, "Settings", lucide::settings)),
             )
     }
