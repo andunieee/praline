@@ -6,6 +6,7 @@
 
 mod cassis;
 mod mints;
+mod proofs;
 pub mod store;
 mod transactions;
 
@@ -24,6 +25,7 @@ use store::{CdkStore, Db};
 pub use cassis::{DEFAULT_RELAYS, PaymentOffer, normalize_relay};
 pub use mints::{Deposit, MintSummary, OnchainDeposit, OnchainOption, Withdrawal};
 pub use transactions::{TxKind, TxStatus, TxView};
+pub use proofs::{MintProofs, ProofHolder};
 
 /// The memo of the tokens the wallet sends itself, between its cdk wallet and the Cassis
 /// network of the same mint. Hidden from the transactions: it is not money moving.

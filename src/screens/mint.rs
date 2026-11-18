@@ -5,7 +5,7 @@ use freya::{
 
 use crate::{
     app::Route,
-    engine::MintSummary,
+    engine::{MintProofs, MintSummary, ProofHolder},
     fmt,
     state::SelectedMint,
     ui::*,
@@ -40,13 +40,14 @@ impl Component for MintScreen {
                         .find(|m| m.url == url)
                         .ok_or_else(|| "this mint was removed".to_owned())?;
                     let txs = engine.transactions(Some(&url)).await?;
-                    Ok::<_, String>((summary, txs))
+                    let proofs = engine.proofs(&url).await?;
+                    Ok::<_, String>((summary, txs, proofs))
                 }
             }
         });
 
         let body: Element = match &*data.state() {
-            FutureState::Fulfilled(Ok((summary, txs))) => {
+            FutureState::Fulfilled(Ok((summary, txs, proofs))) => {
                 let hidden = settings.read().hide_balance;
                 rect()
                     .width(Size::fill())
@@ -55,17 +56,13 @@ impl Component for MintScreen {
                         mint: summary.clone(),
                         hidden,
                     })
+                    .maybe_child((!proofs.locked.is_empty()).then(|| locked_proofs(proofs)))
+                    .child(held_proofs(proofs))
                     .child(
                         rect()
                             .width(Size::fill())
                             .spacing(8.)
-                            .child(
-                                label()
-                                    .font_size(18.)
-                                    .font_weight(FontWeight::BOLD)
-                                    .margin((0., 4.))
-                                    .text("Transactions"),
-                            )
+                            .child(heading("Transactions"))
                             .child(if txs.is_empty() {
                                 empty_state("Nothing here yet.").into_element()
                             } else {
@@ -89,7 +86,7 @@ impl Component for MintScreen {
         };
 
         let title = match &*data.state() {
-            FutureState::Fulfilled(Ok((summary, _))) => summary.name.clone(),
+            FutureState::Fulfilled(Ok((summary, _, _))) => summary.name.clone(),
             _ => "Mint".to_owned(),
         };
 
@@ -100,6 +97,106 @@ impl Component for MintScreen {
             .child(rect().width(Size::fill()).padding((4., 16., 24., 16.)).child(body))
             .into_element()
     }
+}
+
+fn heading(text: &'static str) -> Label {
+    label()
+        .font_size(18.)
+        .font_weight(FontWeight::BOLD)
+        .margin((0., 4.))
+        .text(text)
+}
+
+/// A rounded surface with `rows` under each other, divided.
+fn card(rows: Vec<Rect>) -> Rect {
+    rect()
+        .width(Size::fill())
+        .padding((4., 14.))
+        .corner_radius(16.)
+        .background(palette().surface_secondary)
+        .children(rows.into_iter().enumerate().map(|(i, row)| {
+            rect()
+                .width(Size::fill())
+                .maybe(i > 0, |el| el.child(divider()))
+                .child(row)
+                .into_element()
+        }))
+}
+
+/// One proof: what it is worth on the right, and what to know about it under `title`.
+fn proof_row(title: String, detail: String, amount_sat: u64) -> Rect {
+    let colors = palette();
+    rect()
+        .horizontal()
+        .width(Size::fill())
+        .padding((10., 0.))
+        .spacing(12.)
+        .cross_align(Alignment::center())
+        .child(
+            rect()
+                .width(Size::flex(1.))
+                .spacing(2.)
+                .child(label().font_size(15.).text(title))
+                .child(
+                    label()
+                        .font_size(12.)
+                        .color(colors.text_secondary)
+                        .max_lines(1)
+                        .text_overflow(TextOverflow::Ellipsis)
+                        .text(detail),
+                ),
+        )
+        .child(
+            label()
+                .font_size(16.)
+                .font_weight(FontWeight::BOLD)
+                .text(fmt::sats(amount_sat)),
+        )
+}
+
+fn locked_proofs(proofs: &MintProofs) -> Rect {
+    rect()
+        .width(Size::fill())
+        .spacing(8.)
+        .child(heading("Pending HTLC proofs"))
+        .child(card(
+            proofs
+                .locked
+                .iter()
+                .map(|p| {
+                    proof_row(
+                        format!("HTLC …{}", &p.payment_hash[p.payment_hash.len().saturating_sub(8)..]),
+                        format!("Refundable {}", fmt::when(p.refundable_at)),
+                        p.amount_sat,
+                    )
+                })
+                .collect(),
+        ))
+}
+
+fn held_proofs(proofs: &MintProofs) -> Rect {
+    rect()
+        .width(Size::fill())
+        .spacing(8.)
+        .child(heading("Proofs"))
+        .child(if proofs.held.is_empty() {
+            empty_state("No proofs.")
+        } else {
+            card(
+                proofs
+                    .held
+                    .iter()
+                    .map(|p| {
+                        let holder = match p.holder {
+                            ProofHolder::Wallet => "Wallet",
+                            ProofHolder::Cassis => "Cassis",
+                        };
+                        let state = if p.reserved { " · in use" } else { "" };
+                        proof_row(holder.to_owned(), format!("Keyset {}{state}", p.keyset), p.amount_sat)
+                    })
+                    .collect(),
+            )
+        })
 }
 
 #[derive(PartialEq)]
