@@ -14,7 +14,7 @@ use serde_json::Value;
 use super::{
     Engine,
     mints::host_of,
-    store::{CassisDirection, CassisStatus, CassisTx, CassisTxHash, unix_now},
+    store::{Blob, BlobKey, CassisDirection, CassisStatus, CassisTx, CassisTxHash, unix_now},
 };
 
 /// What paying an invoice would do, for the wallet's payment screen. Everything here comes from
@@ -64,6 +64,29 @@ pub(crate) fn cassis_network(mint_url: &str) -> Option<NetworkId> {
     (back.trim_end_matches('/') == mint_url.trim_end_matches('/')).then_some(id)
 }
 
+/// The nostr relays routes are read from, until the user picks their own.
+pub const DEFAULT_RELAYS: &[&str] = &[
+    "wss://nos.lol",
+    "wss://relay.ditto.pub",
+    "wss://relay.primal.net",
+    "wss://nostr.wine",
+];
+
+const RELAYS_KEY: &str = "setting/relays";
+
+/// A relay as typed, as a `wss://` URL.
+pub fn normalize_relay(relay: &str) -> Option<String> {
+    let relay = relay.trim().trim_end_matches('/');
+    if relay.is_empty() || relay.contains(char::is_whitespace) {
+        return None;
+    }
+    if relay.starts_with("wss://") || relay.starts_with("ws://") {
+        Some(relay.to_owned())
+    } else {
+        Some(format!("wss://{relay}"))
+    }
+}
+
 fn sats_ceil(msat: u64) -> u64 {
     msat.div_ceil(1000)
 }
@@ -81,6 +104,37 @@ impl Engine {
             .unwrap_or_else(|e| e.into_inner())
             .get(mint_url)
             .cloned()
+    }
+
+    /// The nostr relays Cassis routes are read from.
+    pub fn relays(&self) -> Vec<String> {
+        self.0
+            .db
+            .blobs()
+            .get(BlobKey(RELAYS_KEY.to_owned()))
+            .ok()
+            .flatten()
+            .and_then(|blob| serde_json::from_slice(&blob.data).ok())
+            .unwrap_or_else(|| DEFAULT_RELAYS.iter().map(|r| (*r).to_owned()).collect())
+    }
+
+    /// Keep the relays to read Cassis routes from. At least one is needed.
+    pub fn set_relays(&self, relays: Vec<String>) -> Result<(), String> {
+        if relays.is_empty() {
+            return Err("Add at least one relay.".into());
+        }
+        let data = serde_json::to_vec(&relays).map_err(|e| e.to_string())?;
+        self.0
+            .db
+            .blobs()
+            .upsert(&Blob {
+                key: BlobKey(RELAYS_KEY.to_owned()),
+                kind: "setting".to_owned(),
+                group: String::new(),
+                data,
+            })
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 
     /// What the Cassis side of a mint holds, in sats.
@@ -215,7 +269,7 @@ impl Engine {
                         engine.fund_cassis(&mint_url, missing).await?;
                     }
                 }
-                engine.0.node.pay(&offer.invoice, &network, &[]).await
+                engine.0.node.pay(&offer.invoice, &network, &engine.relays()).await
             }
             .await;
 

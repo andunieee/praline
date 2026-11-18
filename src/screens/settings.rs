@@ -1,6 +1,9 @@
 use freya::prelude::*;
 
-use crate::ui::*;
+use crate::{
+    engine::{DEFAULT_RELAYS, normalize_relay},
+    ui::*,
+};
 
 #[derive(PartialEq)]
 pub struct SettingsScreen;
@@ -11,6 +14,11 @@ impl Component for SettingsScreen {
         let mut settings = use_settings();
         let mut show_phrase = use_state(|| false);
         let colors = palette();
+        let relays = use_state({
+            let engine = engine.clone();
+            move || engine.relays().join(", ")
+        });
+        let mut relay_message = use_state(|| None::<Result<String, String>>);
         let hide = settings.read().hide_balance;
 
         let phrase = if show_phrase() {
@@ -52,6 +60,52 @@ impl Component for SettingsScreen {
                                     settings.write().hide_balance = hidden
                                 }))),
                         ),
+                    ))
+                    .child(section(
+                        "Nostr relays",
+                        rect()
+                            .width(Size::fill())
+                            .padding((12., 0.))
+                            .spacing(10.)
+                            .child(
+                                label()
+                                    .font_size(12.)
+                                    .color(colors.text_secondary)
+                                    .text("Where Cassis routes are looked up when a payment needs one. Separate them with commas."),
+                            )
+                            .child(Input::new(relays).width(Size::fill()).placeholder("nos.lol, relay.primal.net"))
+                            .maybe_child(relay_message.read().clone().map(|m| match m {
+                                Ok(text) => notice(text, POSITIVE),
+                                Err(text) => notice(text, NEGATIVE),
+                            }))
+                            .child(
+                                Button::new()
+                                    .outline()
+                                    .on_press({
+                                        let engine = engine.clone();
+                                        move |_| {
+                                            let list: Vec<String> = relays
+                                                .read()
+                                                .split(|c: char| c == '\n' || c == ',' || c.is_whitespace())
+                                                .filter_map(normalize_relay)
+                                                .collect();
+                                            relay_message.set(Some(
+                                                engine.set_relays(list).map(|_| "Saved.".to_owned()),
+                                            ));
+                                        }
+                                    })
+                                    .child("Save relays"),
+                            )
+                            .child(
+                                Button::new().outline().on_press({
+                                    let mut relays = relays;
+                                    move |_| {
+                                        relays.set(DEFAULT_RELAYS.join(", "));
+                                        relay_message.set(None);
+                                    }
+                                })
+                                .child("Use the defaults"),
+                            ),
                     ))
                     .child(section(
                         "Recovery phrase",

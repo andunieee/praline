@@ -21,7 +21,7 @@ use cassis_wallet::{Home, Node, NodeConfig};
 use cdk::wallet::Wallet;
 use store::{CdkStore, Db};
 
-pub use cassis::PaymentOffer;
+pub use cassis::{DEFAULT_RELAYS, PaymentOffer, normalize_relay};
 pub use mints::{Deposit, MintSummary, OnchainDeposit, OnchainOption, Withdrawal};
 pub use transactions::{TxKind, TxStatus, TxView};
 
