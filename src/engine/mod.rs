@@ -5,19 +5,19 @@
 //! runtime (cdk, iroh and reqwest need one) through [`Engine::run`].
 
 mod cassis;
+mod htlc;
 mod mints;
 mod proofs;
 pub mod store;
 mod transactions;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     future::Future,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
-use cassis_networks::cashu::CashuAdapter;
 use cassis_wallet::{Home, Node, NodeConfig};
 use cdk::wallet::Wallet;
 use store::{CdkStore, Db};
@@ -27,8 +27,8 @@ pub use mints::{Deposit, MintSummary, OnchainDeposit, OnchainOption, Withdrawal}
 pub use transactions::{TxKind, TxStatus, TxView};
 pub use proofs::{MintProofs, ProofHolder};
 
-/// The memo of the tokens the wallet sends itself, between its cdk wallet and the Cassis
-/// network of the same mint. Hidden from the transactions: it is not money moving.
+/// The memo of the tokens an earlier version sent itself, between its cdk wallet and a Cassis
+/// wallet of the same mint. Hidden from the transactions: it was not money moving.
 pub(crate) const FLOAT_MEMO: &str = "praline:float";
 
 /// A handle to the wallet. Cheap to clone.
@@ -46,8 +46,8 @@ struct Inner {
     node: Node,
     /// The cdk wallet of each mint, by URL.
     wallets: Mutex<HashMap<String, Arc<Wallet>>>,
-    /// The Cassis side of each mint that has one, by URL: its ecash held for payments.
-    adapters: Mutex<HashMap<String, Arc<CashuAdapter>>>,
+    /// The mints that pay and are paid with Cassis, by URL.
+    cassis_mints: Mutex<HashSet<String>>,
 }
 
 impl Drop for Inner {
@@ -98,7 +98,7 @@ impl Engine {
             home: Mutex::new(home),
             node,
             wallets: Mutex::default(),
-            adapters: Mutex::default(),
+            cassis_mints: Mutex::default(),
         }));
         engine.run_blocking(engine.clone().reopen_networks());
         engine.spawn_upkeep();

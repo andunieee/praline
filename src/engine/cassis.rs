@@ -1,19 +1,18 @@
 //! Paying and receiving Cassis invoices on the mints' networks.
 //!
-//! A mint's Cassis network (`cashu::<host>`) keeps its own ecash, locked into HTLCs for each
-//! payment, apart from the cdk wallet's. So paying moves what is needed from the cdk wallet to
-//! the Cassis side first, and what is left comes back afterwards: the mint balance the UI shows
-//! is the two together.
+//! A mint's Cassis network (`cashu::<host>`) is served by the mint's own cdk wallet: it locks the
+//! HTLCs of payments and claims the ones it is paid (see [`htlc::CdkWallet`]), so the wallet's
+//! ecash is all there is.
 
 use std::{collections::HashSet, sync::Arc};
 
 use cassis_core::{Invoice, NetworkId};
 use cassis_core::routing::RouteAnnouncement;
-use cassis_networks::{Wallet as NetworkWallet, cashu::CashuAdapter};
 use serde_json::Value;
 
 use super::{
     Engine,
+    htlc::CdkWallet,
     mints::host_of,
     store::{Blob, BlobKey, CassisDirection, CassisStatus, CassisTx, CassisTxHash, CopSessionId, RouteHop, unix_now},
 };
@@ -112,13 +111,13 @@ fn fee_room(amount_sat: u64) -> u64 {
 }
 
 impl Engine {
-    pub(crate) fn adapter(&self, mint_url: &str) -> Option<Arc<CashuAdapter>> {
+    /// Whether the mint pays and is paid with Cassis.
+    pub(crate) fn on_cassis(&self, mint_url: &str) -> bool {
         self.0
-            .adapters
+            .cassis_mints
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .get(mint_url)
-            .cloned()
+            .contains(mint_url)
     }
 
     /// The nostr relays Cassis routes are read from.
@@ -152,57 +151,40 @@ impl Engine {
             .map_err(|e| e.to_string())
     }
 
-    /// What the Cassis side of a mint holds, in sats.
-    pub(crate) fn float_sat(&self, mint_url: &str) -> u64 {
-        self.adapter(mint_url)
-            .and_then(|a| a.balance_msat().ok())
-            .map_or(0, |msat| msat / 1000)
-    }
-
-    /// Put the mint on Cassis, if it can be.
-    pub(crate) async fn open_cassis(&self, mint_url: &str) {
-        if let Err(error) = self.try_open_cassis(mint_url).await {
+    /// Put the mint on Cassis, if it can be: its cdk wallet funds the payments and claims the
+    /// ones it is paid.
+    pub(crate) fn open_cassis(&self, mint_url: &str) {
+        if let Err(error) = self.try_open_cassis(mint_url) {
             tracing::warn!("{mint_url} is not on Cassis: {error}");
         }
     }
 
-    async fn try_open_cassis(&self, mint_url: &str) -> Result<(), String> {
+    fn try_open_cassis(&self, mint_url: &str) -> Result<(), String> {
         let network = cassis_network(mint_url).ok_or("its address is not a plain host")?;
-        if self.adapter(mint_url).is_some() {
-            return Ok(());
-        }
-        let settings = {
-            let mut home = self.0.home.lock().unwrap_or_else(|e| e.into_inner());
-            if home.config.network(&network).is_err() {
-                home.enable(&network, |_| Ok(()))?;
-            }
-            home.settings(&network)?
-        };
-        let (opened, wallet) =
-            cassis_networks::open_wallet(&network, &settings, &self.0.node.span()).await?;
-        #[allow(irrefutable_let_patterns)]
-        let NetworkWallet::Cashu(adapter) = wallet else {
-            return Err("not a cashu network".into());
-        };
-        self.0.node.add_network(opened);
-        self.0
-            .adapters
+        if !self
+            .0
+            .cassis_mints
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .insert(mint_url.to_owned(), adapter);
+            .insert(mint_url.to_owned())
+        {
+            return Ok(());
+        }
+        let wallet = Arc::new(CdkWallet::new(network.clone(), self.wallet(mint_url)?, &self.0.seed));
+        self.0.node.set_funder(network.clone(), wallet.clone());
+        self.0.node.set_receiver(network, wallet);
         Ok(())
     }
 
-    /// Open the Cassis side of every mint the wallet had, at startup.
+    /// Put every mint the wallet had on Cassis, at startup.
     pub(crate) async fn reopen_networks(self) {
-        let ids = {
-            let home = self.0.home.lock().unwrap_or_else(|e| e.into_inner());
-            home.config.network_ids().unwrap_or_default()
-        };
-        for id in ids.into_iter().filter(|id| id.kind() == "cashu") {
-            if let Ok(url) = cassis_networks::cashu::mint_url(&id) {
-                self.open_cassis(url.trim_end_matches('/')).await;
-            }
+        let urls = cdk::cdk_database::WalletDatabase::get_mints(&self.0.store)
+            .await
+            .unwrap_or_default()
+            .into_keys()
+            .map(|url| url.to_string());
+        for url in urls {
+            self.open_cassis(url.trim_end_matches('/'));
         }
     }
 
@@ -215,10 +197,10 @@ impl Engine {
         // Any mint on Cassis can pay: if the invoice is not on its network, the payment is routed.
         let urls: Vec<String> = self
             .0
-            .adapters
+            .cassis_mints
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .keys()
+            .iter()
             .cloned()
             .collect();
         let mut options = Vec::new();
@@ -277,18 +259,8 @@ impl Engine {
             };
             engine.0.db.cassis_txes().upsert(&row).map_err(|e| e.to_string())?;
 
+            // The HTLC is funded from the mint's cdk wallet, see [`funder::CdkFunder`].
             let outcome = async {
-                let want = offer.amount_sat + fee_room(offer.amount_sat);
-                let held = engine.float_sat(&mint_url);
-                if held < want {
-                    let cdk_sat = u64::from(
-                        engine.wallet(&mint_url)?.total_balance().await.map_err(|e| e.to_string())?,
-                    );
-                    let missing = (want - held).min(cdk_sat);
-                    if missing > 0 {
-                        engine.fund_cassis(&mint_url, missing).await?;
-                    }
-                }
                 engine
                     .0
                     .node
@@ -317,7 +289,6 @@ impl Engine {
             };
             match outcome {
                 Ok(()) => {
-                    engine.consolidate(&mint_url).await;
                     let after = engine.balance(&mint_url).await.unwrap_or(before);
                     row.status = CassisStatus::Done;
                     row.fee_sat = before.saturating_sub(after).saturating_sub(offer.amount_sat);
@@ -331,8 +302,6 @@ impl Engine {
                     row.status = CassisStatus::Failed;
                     row.error = Some(error.clone());
                     engine.0.db.cassis_txes().upsert(&row).map_err(|e| e.to_string())?;
-                    // What was moved for it is still on the Cassis side.
-                    engine.consolidate(&mint_url).await;
                     Err(error)
                 }
             }
@@ -348,7 +317,7 @@ impl Engine {
             let Some(id) = cassis_network(&summary.url) else {
                 continue;
             };
-            if self.adapter(&summary.url).is_some() && networks.iter().any(|n| *n == id.0) {
+            if self.on_cassis(&summary.url) && networks.iter().any(|n| *n == id.0) {
                 found.push((summary.url, summary.name));
             }
         }
@@ -407,9 +376,7 @@ impl Engine {
         let Ok(rows) = self.0.db.cassis_txes().all() else {
             return;
         };
-        let mut busy_mints = std::collections::HashSet::new();
         for mut row in rows.into_iter().filter(|r| r.status == CassisStatus::Pending) {
-            busy_mints.insert(row.mint_url.clone());
             let done = hash_bytes(&row.payment_hash.0).is_some_and(|hash| {
                 self.0
                     .node
@@ -429,20 +396,6 @@ impl Engine {
                 continue;
             }
             let _ = self.0.db.cassis_txes().upsert(&row);
-        }
-        // Ecash left on the Cassis side (a refund, a payment received) goes back to the wallet.
-        let mints: Vec<String> = self
-            .0
-            .adapters
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .keys()
-            .cloned()
-            .collect();
-        for mint in mints {
-            if !busy_mints.contains(&mint) && self.float_sat(&mint) > 0 {
-                self.consolidate(&mint).await;
-            }
         }
     }
 }

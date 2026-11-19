@@ -8,15 +8,14 @@ use cdk::{
     Amount,
 };
 
-use super::{Engine, FLOAT_MEMO};
+use super::Engine;
 
 /// A mint of the wallet, with what it holds.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MintSummary {
     pub url: String,
     pub name: String,
-    /// What the wallet holds there, in sats: ecash in the cdk wallet and ecash kept for Cassis
-    /// payments.
+    /// What the wallet holds there, in sats.
     pub balance_sat: u64,
     /// Whether payments can be made through it with Cassis (`cashu::<host>`).
     pub cassis: bool,
@@ -79,7 +78,7 @@ impl Engine {
             )
             .await
             .map_err(|e| e.to_string())?;
-            engine.open_cassis(&url).await;
+            engine.open_cassis(&url);
             engine.mint_summary(&url).await
         })
         .await
@@ -134,7 +133,7 @@ impl Engine {
             onchain_deposit,
             onchain_withdraw,
             balance_sat: self.balance(url).await?,
-            cassis: self.adapter(url).is_some(),
+            cassis: self.on_cassis(url),
         })
     }
 
@@ -145,7 +144,7 @@ impl Engine {
             .total_balance()
             .await
             .map_err(|e| e.to_string())?;
-        Ok(u64::from(held) + self.float_sat(url))
+        Ok(u64::from(held))
     }
 
     /// Forget a mint. Only one that holds nothing.
@@ -207,7 +206,6 @@ impl Engine {
     pub async fn quote_withdrawal(&self, url: &str, invoice: &str) -> Result<Withdrawal, String> {
         let (engine, url, invoice) = (self.clone(), url.to_owned(), invoice.trim().to_owned());
         self.run(async move {
-            engine.consolidate(&url).await;
             let quote = engine
                 .wallet(&url)?
                 .melt_quote(PaymentMethod::BOLT11, invoice, None, None)
@@ -292,7 +290,6 @@ impl Engine {
     ) -> Result<Vec<OnchainOption>, String> {
         let (engine, url, address) = (self.clone(), url.to_owned(), address.trim().to_owned());
         self.run(async move {
-            engine.consolidate(&url).await;
             let quotes = engine
                 .wallet(&url)?
                 .quote_onchain_melt_options(&address, Amount::from(amount_sat), None)
@@ -349,7 +346,6 @@ impl Engine {
     ) -> Result<String, String> {
         let (engine, url) = (self.clone(), url.to_owned());
         self.run(async move {
-            engine.consolidate(&url).await;
             let options = SendOptions {
                 memo: memo.filter(|m| !m.is_empty()).map(|memo| SendMemo {
                     memo,
@@ -389,49 +385,6 @@ impl Engine {
             })
             .await?;
         Ok((url, u64::from(received)))
-    }
-
-    /// Move the ecash held for Cassis payments back into the cdk wallet, where withdrawals and
-    /// tokens are made from.
-    pub(crate) async fn consolidate(&self, url: &str) {
-        let Some(adapter) = self.adapter(url) else {
-            return;
-        };
-        let sats = adapter.balance_msat().unwrap_or(0) / 1000;
-        if sats == 0 {
-            return;
-        }
-        let moved = async {
-            let token = adapter.send_token(sats).await?;
-            self.wallet(url)?
-                .receive(&token, ReceiveOptions::default())
-                .await
-                .map_err(|e| e.to_string())
-        };
-        if let Err(error) = moved.await {
-            tracing::warn!("could not move the ecash of {url} back to the wallet: {error}");
-        }
-    }
-
-    /// Move `sats` from the cdk wallet into the Cassis side of the mint, so Cassis can lock them.
-    pub(crate) async fn fund_cassis(&self, url: &str, sats: u64) -> Result<(), String> {
-        let adapter = self.adapter(url).ok_or("this mint is not on Cassis")?;
-        let options = SendOptions {
-            memo: Some(SendMemo {
-                memo: FLOAT_MEMO.into(),
-                include_memo: true,
-            }),
-            // The receiving side pays the swap fee, so ask for enough to cover it.
-            ..Default::default()
-        };
-        let wallet = self.wallet(url)?;
-        let prepared = wallet
-            .prepare_send(Amount::from(sats), options)
-            .await
-            .map_err(|e| e.to_string())?;
-        let token = prepared.confirm(None).await.map_err(|e| e.to_string())?;
-        adapter.receive_token(&token.to_string()).await?;
-        Ok(())
     }
 }
 

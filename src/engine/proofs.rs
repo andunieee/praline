@@ -69,27 +69,8 @@ impl Engine {
                     reserved: p.state != State::Unspent,
                 })
                 .collect();
-            let mut locked = Vec::new();
-            if let Some(adapter) = engine.adapter(&url) {
-                held.extend(adapter.held_proofs()?.into_iter().map(|p| ProofView {
-                    amount_sat: p.amount_sat,
-                    keyset: p.keyset,
-                    holder: ProofHolder::Cassis,
-                    reserved: false,
-                }));
-                locked = adapter
-                    .locked_proofs()?
-                    .into_iter()
-                    .map(|p| LockedProofView {
-                        amount_sat: p.amount_sat,
-                        keyset: p.keyset,
-                        payment_hash: p.payment_hash.to_string(),
-                        refundable_at: p.locktime,
-                    })
-                    .collect();
-            }
+            let locked: Vec<LockedProofView> = Vec::new();
             held.sort_by_key(|p| std::cmp::Reverse(p.amount_sat));
-            locked.sort_by_key(|p| p.refundable_at);
             Ok(MintProofs { locked, held })
         })
         .await
