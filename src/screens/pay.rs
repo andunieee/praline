@@ -143,7 +143,7 @@ impl Component for PayScreen {
                 let _ = refresh();
                 let engine = engine.clone();
                 async move {
-                    let mut flows = engine.db().flows().all().map_err(|e| e.to_string())?;
+                    let mut flows = engine.db().cop_sessions().all().map_err(|e| e.to_string())?;
                     flows.sort_by_key(|f| std::cmp::Reverse(f.last_opened));
                     flows.truncate(8);
                     Ok::<_, String>(flows)
@@ -156,7 +156,7 @@ impl Component for PayScreen {
                 .iter()
                 .filter_map(|flow| {
                     let uri = freya_cop::CopUri::parse(&flow.uri).ok()?;
-                    let session = flow.session.0.clone();
+                    let session = flow.id.0.clone();
                     let title = flow.name.clone().unwrap_or_else(|| fmt::short(&uri.endpoint));
                     let colors = palette();
                     Some(

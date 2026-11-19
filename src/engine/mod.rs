@@ -276,7 +276,7 @@ mod tests {
         let offer = engine.run_blocking(engine.offer(offer.invoice)).expect("offer");
         println!("offer: {} sat, options {:?}", offer.amount_sat, offer.options);
         let paid = engine
-            .run_blocking(engine.pay(&offer, &offer.options[0].mint_url, Some("demo".into()), None))
+            .run_blocking(engine.pay(&offer, &offer.options[0].mint_url, Some("demo".into()), None, None))
             .expect("pay");
         println!("paid {paid:?}");
 

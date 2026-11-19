@@ -5,16 +5,17 @@
 //! the Cassis side first, and what is left comes back afterwards: the mint balance the UI shows
 //! is the two together.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use cassis_core::{Invoice, NetworkId};
+use cassis_core::routing::RouteAnnouncement;
 use cassis_networks::{Wallet as NetworkWallet, cashu::CashuAdapter};
 use serde_json::Value;
 
 use super::{
     Engine,
     mints::host_of,
-    store::{Blob, BlobKey, CassisDirection, CassisStatus, CassisTx, CassisTxHash, unix_now},
+    store::{Blob, BlobKey, CassisDirection, CassisStatus, CassisTx, CassisTxHash, CopSessionId, RouteHop, unix_now},
 };
 
 /// What paying an invoice would do, for the wallet's payment screen. Everything here comes from
@@ -85,6 +86,20 @@ pub fn normalize_relay(relay: &str) -> Option<String> {
     } else {
         Some(format!("wss://{relay}"))
     }
+}
+
+fn route_hop(hop: &RouteAnnouncement) -> RouteHop {
+    RouteHop {
+        node: hop.node_pubkey.to_string(),
+        from: hop.from.0.clone(),
+        to: hop.to.0.clone(),
+        fee_base_msat: hop.fee_base_msat,
+        fee_ppm: hop.fee_ppm,
+    }
+}
+
+fn hash_bytes(hex: &str) -> Option<[u8; 32]> {
+    lowercase_hex::decode(hex).ok()?.try_into().ok()
 }
 
 fn sats_ceil(msat: u64) -> u64 {
@@ -235,6 +250,7 @@ impl Engine {
         mint_url: &str,
         peer: Option<String>,
         memo: Option<String>,
+        cop_session: Option<String>,
     ) -> Result<PaidInvoice, String> {
         let (engine, offer, mint_url) = (self.clone(), offer.clone(), mint_url.to_owned());
         self.run(async move {
@@ -252,6 +268,10 @@ impl Engine {
                 peer,
                 status: CassisStatus::Pending,
                 error: None,
+                route: Vec::new(),
+                failed_hop: None,
+                hop_error: None,
+                cop_session: cop_session.map(CopSessionId),
                 at: unix_now(),
                 expires_at: offer.expires_at,
             };
@@ -269,13 +289,34 @@ impl Engine {
                         engine.fund_cassis(&mint_url, missing).await?;
                     }
                 }
-                engine.0.node.pay(&offer.invoice, &network, &engine.relays()).await
+                engine
+                    .0
+                    .node
+                    .pay(&offer.invoice, &network, &engine.relays(), &HashSet::new())
+                    .await
             }
             .await;
 
             let mut row = row;
+            // A payment that could not start has no route; otherwise the report says how far it got.
+            let outcome = match outcome {
+                Ok(report) => {
+                    row.route = report.route.iter().map(route_hop).collect();
+                    match report.outcome {
+                        Ok(_) => Ok(()),
+                        Err(failure) => {
+                            if let Some(hop) = &failure.hop {
+                                row.failed_hop = u32::try_from(hop.index).ok();
+                                row.hop_error = Some(hop.error.to_string());
+                            }
+                            Err(failure.message)
+                        }
+                    }
+                }
+                Err(error) => Err(error),
+            };
             match outcome {
-                Ok(_) => {
+                Ok(()) => {
                     engine.consolidate(&mint_url).await;
                     let after = engine.balance(&mint_url).await.unwrap_or(before);
                     row.status = CassisStatus::Done;
@@ -347,6 +388,10 @@ impl Engine {
                     peer,
                     status: CassisStatus::Pending,
                     error: None,
+                    route: Vec::new(),
+                    failed_hop: None,
+                    hop_error: None,
+                    cop_session: None,
                     at: unix_now(),
                     expires_at,
                 })
@@ -365,15 +410,16 @@ impl Engine {
         let mut busy_mints = std::collections::HashSet::new();
         for mut row in rows.into_iter().filter(|r| r.status == CassisStatus::Pending) {
             busy_mints.insert(row.mint_url.clone());
-            let done = self
-                .0
-                .node
-                .db()
-                .transactions()
-                .get(cassis_wallet::db::TransactionHash(row.payment_hash.0.clone()))
-                .ok()
-                .flatten()
-                .is_some();
+            let done = hash_bytes(&row.payment_hash.0).is_some_and(|hash| {
+                self.0
+                    .node
+                    .db()
+                    .transactions()
+                    .get(cassis_wallet::db::TransactionHash(hash))
+                    .ok()
+                    .flatten()
+                    .is_some()
+            });
             if done {
                 row.status = CassisStatus::Done;
             } else if row.expires_at + 3600 < now {

@@ -1,6 +1,6 @@
 //! `<data>/praline.redb`: everything the wallet keeps, in orangedb.
 //!
-//! * [`Db`] holds the wallet's own records: Cassis payments and the order flows it opened.
+//! * [`Db`] holds the wallet's own records: Cassis payments and the COP sessions it opened.
 //! * [`CdkStore`] is cdk's wallet database (proofs, quotes, keysets, sagas, ...) on top of the
 //!   same file: cdk ships no database of its own, only the trait, so the rows are cdk's types as
 //!   JSON blobs under a kind, indexed by the kind and the mint they belong to.
@@ -26,6 +26,18 @@ pub mod schema {
         Failed,
     }
 
+    /// A hop of the route a payment took.
+    #[embed]
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct RouteHop {
+        /// The router's node key.
+        pub node: String,
+        pub from: String,
+        pub to: String,
+        pub fee_base_msat: u64,
+        pub fee_ppm: u64,
+    }
+
     /// A payment on the Cassis network of one of the mints, as the wallet shows it.
     #[entity]
     #[derive(Clone, Debug, PartialEq)]
@@ -43,19 +55,28 @@ pub mod schema {
         pub peer: Option<String>,
         pub status: CassisStatus,
         pub error: Option<String>,
+        /// The route a payment was sent over: empty when it was direct, or never got one.
+        pub route: Vec<RouteHop>,
+        /// The position in `route` of the hop a failed payment stopped at, when a hop is to blame.
+        pub failed_hop: Option<u32>,
+        /// What the failed hop did.
+        pub hop_error: Option<String>,
+        /// The COP session the payment was made in, if it was made in one.
+        #[references(CopSession, on_delete = set_null)]
+        pub cop_session: Option<CopSessionId>,
         #[index]
         pub at: u64,
         /// When an unpaid invoice we issued stops being payable.
         pub expires_at: u64,
     }
 
-    /// An order flow that was opened, kept so it can be reopened with the same session.
+    /// A COP session that was opened, kept so it can be reopened with the same session id.
     #[entity]
     #[derive(Clone, Debug, PartialEq)]
-    pub struct Flow {
-        /// The `session` string, which names the flow at its server.
+    pub struct CopSession {
+        /// The session id sent to the COP server, which names the session there.
         #[id(String)]
-        pub session: FlowSession,
+        pub id: CopSessionId,
         /// The `cop://` URI it was opened with.
         pub uri: String,
         pub name: Option<String>,
