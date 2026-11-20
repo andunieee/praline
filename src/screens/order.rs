@@ -7,6 +7,7 @@ use freya::{
     icons::lucide,
     prelude::*,
 };
+use crate::skin::PralineSkin;
 use freya_cop::{
     CopEvent,
     CopSession,
@@ -123,7 +124,7 @@ impl Component for OrderScreen {
                                             )),
                                     ),
                             )
-                            .child(CopView::new(session.clone(), on_event)),
+                            .child(CopView::new(session.clone(), on_event).skin(PralineSkin::shared())),
                     ),
             )
             .maybe_child(sheet.read().clone().map(|s| {
@@ -366,6 +367,7 @@ impl Component for PayCard {
                             } else {
                                 colors.surface_tertiary
                             })
+                            .cursor(CursorIcon::Pointer)
                             .on_press(move |_| chosen.set(i))
                             .child(
                                 label()
@@ -505,6 +507,7 @@ impl Component for ReceiveCard {
                             } else {
                                 colors.surface_tertiary
                             })
+                            .cursor(CursorIcon::Pointer)
                             .on_press(move |_| chosen.set(i))
                             .child(label().max_lines(1).text(name.clone()))
                             .into_element()

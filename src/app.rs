@@ -12,7 +12,6 @@ use crate::{
         PendingInvoice,
         Refresh,
         SelectedMint,
-        Settings,
     },
     ui::{
         ACCENT,
@@ -99,8 +98,6 @@ fn dirs_next() -> std::path::PathBuf {
 
 pub fn app() -> impl IntoElement {
     use_init_theme(|| wallet_theme(true));
-    let settings = use_state(Settings::default);
-    use_provide_context(move || settings);
     let selected = use_state(|| None::<String>);
     use_provide_context(move || SelectedMint(selected));
     let flow = use_state(|| None);
@@ -251,6 +248,7 @@ impl Component for NavTab {
             .spacing(4.)
             .padding((6., 0.))
             .corner_radius(12.)
+            .cursor(CursorIcon::Pointer)
             .on_press(move |_| {
                 if RouterContext::get().current::<Route>() != route {
                     let _ = RouterContext::get().replace(route.clone());

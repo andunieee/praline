@@ -19,7 +19,6 @@ use crate::{
     fmt,
     state::{
         Refresh,
-        Settings,
     },
 };
 
@@ -29,10 +28,6 @@ pub const NEGATIVE: Color = Color::from_rgb(235, 95, 95);
 
 pub fn palette() -> ColorsSheet {
     get_theme_or_default().read().colors.clone()
-}
-
-pub fn use_settings() -> State<Settings> {
-    use_consume::<State<Settings>>()
 }
 
 pub fn use_engine() -> Engine {
@@ -82,6 +77,7 @@ pub fn page_header(title: impl Into<String>, back: bool) -> Rect {
                     .padding(6.)
                     .corner_radius(99.)
                     .background(colors.surface_secondary)
+                    .cursor(CursorIcon::Pointer)
                     .on_press(|_| RouterContext::get().go_back())
                     .child(icon(lucide::chevron_left(), 22., colors.text_primary)),
             )
@@ -240,6 +236,7 @@ impl Component for QrCard {
                     .padding((12., 14.))
                     .corner_radius(14.)
                     .background(colors.surface_secondary)
+                    .cursor(CursorIcon::Pointer)
                     .on_press(move |_| {
                         let _ = Clipboard::set(data.clone());
                         let _ = Clipboard::set_primary(data.clone());
@@ -265,9 +262,14 @@ impl Component for QrCard {
     }
 }
 
+/// A button that shows a pointer cursor on hover.
+pub fn button() -> Button {
+    Button::new().cursor(CursorIcon::Pointer)
+}
+
 /// A wide button.
 pub fn wide_button(text: impl Into<String>) -> Button {
-    Button::new()
+    button()
         .expanded()
         .width(Size::fill())
         .child(text.into())
@@ -339,6 +341,7 @@ impl Component for AmountKeypad {
                             .spacing(8.)
                             .children(self.presets.iter().map(|&preset| {
                                 Chip::new()
+                                    .cursor(CursorIcon::Pointer)
                                     .selected(value == preset)
                                     .on_press(move |_| amount.set(preset))
                                     .child(fmt::group_thousands(preset))
@@ -369,6 +372,7 @@ fn keypad_button(key: Key, mut on_press: impl FnMut(Key) + 'static) -> Rect {
         .center()
         .corner_radius(14.)
         .background(colors.surface_secondary)
+        .cursor(CursorIcon::Pointer)
         .on_press(move |_| on_press(key))
         .child(match key {
             Key::Digit(d) => label()
@@ -395,8 +399,6 @@ pub struct TxRow {
 impl Component for TxRow {
     fn render(&self) -> impl IntoElement {
         let colors = palette();
-        let settings = use_settings();
-        let hidden = settings.read().hide_balance;
         let tx = &self.tx;
         let (glyph, tint) = match tx.kind {
             TxKind::Deposit => (lucide::zap(), POSITIVE),
@@ -411,11 +413,7 @@ impl Component for TxRow {
             _ if tx.kind.incoming() => POSITIVE,
             _ => colors.text_primary,
         };
-        let amount = if hidden {
-            "••••".to_owned()
-        } else {
-            fmt::signed_sats(tx.amount_sat, tx.kind.incoming())
-        };
+        let amount = fmt::signed_sats(tx.amount_sat, tx.kind.incoming());
         let status = match tx.status {
             TxStatus::Pending => Some(pill("Pending", ACCENT)),
             TxStatus::Failed => Some(pill("Failed", NEGATIVE)),

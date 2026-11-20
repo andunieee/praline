@@ -6,6 +6,7 @@ mod engine;
 mod fmt;
 #[cfg(target_os = "android")]
 mod scanner;
+mod skin;
 mod screens;
 mod state;
 mod ui;

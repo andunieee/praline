@@ -1288,6 +1288,7 @@ dependencies = [
 [[package]]
 name = "cassis-cashu"
 version = "0.1.0"
+source = "git+https://github.com/andunieee/cassis?rev=18fb852c298685a55d28264b689aa46b6f7e97bd#18fb852c298685a55d28264b689aa46b6f7e97bd"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1305,6 +1306,7 @@ dependencies = [
 [[package]]
 name = "cassis-core"
 version = "0.1.0"
+source = "git+https://github.com/andunieee/cassis?rev=18fb852c298685a55d28264b689aa46b6f7e97bd#18fb852c298685a55d28264b689aa46b6f7e97bd"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1333,6 +1335,7 @@ dependencies = [
 [[package]]
 name = "cassis-networks"
 version = "0.1.0"
+source = "git+https://github.com/andunieee/cassis?rev=18fb852c298685a55d28264b689aa46b6f7e97bd#18fb852c298685a55d28264b689aa46b6f7e97bd"
 dependencies = [
  "cassis-cashu",
  "cassis-core",
@@ -1342,6 +1345,7 @@ dependencies = [
 [[package]]
 name = "cassis-wallet"
 version = "0.1.0"
+source = "git+https://github.com/andunieee/cassis?rev=18fb852c298685a55d28264b689aa46b6f7e97bd#18fb852c298685a55d28264b689aa46b6f7e97bd"
 dependencies = [
  "cassis-core",
  "cassis-networks",
@@ -2774,9 +2778,7 @@ dependencies = [
 
 [[package]]
 name = "freya-cop"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13c9b6940999af48e41eae92e8245ef8176c6b20516d2a9731372a80f2d8c816"
+version = "0.1.1"
 dependencies = [
  "async-channel",
  "base64 0.22.1",

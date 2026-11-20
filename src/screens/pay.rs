@@ -168,6 +168,7 @@ impl Component for PayScreen {
                             .padding((10., 0.))
                             .spacing(12.)
                             .cross_align(Alignment::center())
+                            .cursor(CursorIcon::Pointer)
                             .on_press(move |_| {
                                 pending_flow.set(Some(FlowRequest {
                                     uri: uri.clone(),
@@ -232,7 +233,7 @@ impl Component for PayScreen {
                             .content(Content::flex())
                             .spacing(8.)
                             .child(
-                                Button::new()
+                                button()
                                     .width(Size::flex(1.))
                                     .outline()
                                     .on_press(move |_| {
@@ -243,7 +244,7 @@ impl Component for PayScreen {
                                     .child("Paste"),
                             )
                             .child(
-                                Button::new()
+                                button()
                                     .width(Size::flex(2.))
                                     .filled()
                                     .enabled(!input.read().trim().is_empty() && !busy())
@@ -286,12 +287,9 @@ impl Component for Scanner {
             .height(Size::px(VIEWFINDER))
             .corner_radius(28.)
             .overflow(Overflow::Clip)
-            .background(
-                RadialGradient::new()
-                    .stop(((40, 40, 48), 0.))
-                    .stop(((8, 8, 10), 100.)),
-            )
+            .background(palette().surface_tertiary)
             .center()
+            .cursor(CursorIcon::Pointer)
             .on_press(|_| {
                 #[cfg(target_os = "android")]
                 crate::scanner::start();

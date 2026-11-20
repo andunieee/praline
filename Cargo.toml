@@ -19,9 +19,9 @@ log = "0.4"
 freya-hypereffect = { path = "../freya-hypereffect" }
 freya-cop = "0.1.0"
 hypereffect = { path = "../hypereffect/rust/hypereffect" }
-cassis-core = { path = "../cassis/cassis-core" }
-cassis-networks = { path = "../cassis/cassis-networks", features = ["cashu"] }
-cassis-wallet = { path = "../cassis/cassis-wallet", default-features = false, features = ["cashu"] }
+cassis-core = { git = "https://github.com/andunieee/cassis", rev = "18fb852c298685a55d28264b689aa46b6f7e97bd" }
+cassis-networks = { git = "https://github.com/andunieee/cassis", rev = "18fb852c298685a55d28264b689aa46b6f7e97bd", features = ["cashu"] }
+cassis-wallet = { git = "https://github.com/andunieee/cassis", rev = "18fb852c298685a55d28264b689aa46b6f7e97bd", default-features = false, features = ["cashu"] }
 cdk = { version = "0.17.3", default-features = false, features = ["wallet"] }
 orangedb = "0.3.0"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
@@ -73,4 +73,5 @@ tiny-diff = { path = "../freya/crates/tiny-diff" }
 tiny-notify = { path = "../freya/crates/tiny-notify" }
 pathgraph = { path = "../freya/crates/pathgraph" }
 freya-hypereffect = { path = "../freya-hypereffect" }
+freya-cop = { path = "../freya-cop" }
 hypereffect = { path = "../hypereffect/rust/hypereffect" }

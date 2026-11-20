@@ -1,6 +1,6 @@
 # Praline
 
-A [Cashu](https://cashu.space) wallet for desktop and Android, built with [Freya](https://github.com/marc2332/freya), whose main way to pay is [Cassis](../cassis) through the [Cassis Order Protocol](../cassis_order_protocol) (COP).
+A [Cashu](https://cashu.space) wallet for desktop and Android, built with [Freya](https://github.com/marc2332/freya), whose main way to pay is [Cassis](https://github.com/andunieee/cassis) through the [Cassis Order Protocol](https://github.com/cassiscash/cassis_order_protocol) (COP).
 
 - **Mints**: the home screen lists the mints you added with their balances. Tapping one shows its balance, its transactions and what you can do there: deposit and withdraw over Lightning (mint and melt), send a token, redeem one.
 - **Activity**: every transaction, tagged by type (deposit, withdraw, token sent or received, Cassis sent or received), with its amount, description and mint.

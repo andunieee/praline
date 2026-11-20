@@ -72,7 +72,7 @@ impl Component for OnchainWithdrawScreen {
                         .placeholder("Bitcoin address"),
                 )
                 .child(
-                    Button::new()
+                    button()
                         .width(Size::fill())
                         .outline()
                         .on_press(move |_| {
@@ -126,6 +126,7 @@ impl Component for OnchainWithdrawScreen {
                                     .width(if active { 2. } else { 1. })
                                     .alignment(BorderAlignment::Inner),
                             )
+                            .cursor(CursorIcon::Pointer)
                             .on_press(move |_| chosen.set(i))
                             .child(label().width(Size::flex(1.)).text(eta))
                             .child(

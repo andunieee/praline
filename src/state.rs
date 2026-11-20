@@ -1,19 +1,6 @@
 use freya::prelude::State;
 use freya_cop::CopUri;
 
-#[derive(Clone, PartialEq)]
-pub struct Settings {
-    pub hide_balance: bool,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            hide_balance: false,
-        }
-    }
-}
-
 /// The mint the mint screens are about.
 #[derive(Clone, Copy, PartialEq)]
 pub struct SelectedMint(pub State<Option<String>>);

@@ -26,7 +26,6 @@ impl Component for MintScreen {
         };
         let engine = use_engine();
         let refresh = use_refresh();
-        let settings = use_settings();
 
         let data = use_future({
             let (engine, url) = (engine.clone(), url.clone());
@@ -48,13 +47,11 @@ impl Component for MintScreen {
 
         let body: Element = match &*data.state() {
             FutureState::Fulfilled(Ok((summary, txs, proofs))) => {
-                let hidden = settings.read().hide_balance;
                 rect()
                     .width(Size::fill())
                     .spacing(18.)
                     .child(Header {
                         mint: summary.clone(),
-                        hidden,
                     })
                     .maybe_child((!proofs.locked.is_empty()).then(|| locked_proofs(proofs)))
                     .child(held_proofs(proofs))
@@ -202,7 +199,6 @@ fn held_proofs(proofs: &MintProofs) -> Rect {
 #[derive(PartialEq)]
 struct Header {
     mint: MintSummary,
-    hidden: bool,
 }
 
 impl Component for Header {
@@ -215,6 +211,7 @@ impl Component for Header {
                 .center()
                 .corner_radius(16.)
                 .background(colors.surface_secondary)
+                .cursor(CursorIcon::Pointer)
                 .on_press(move |_| {
                     let _ = RouterContext::get().push(route.clone());
                 })
@@ -232,11 +229,7 @@ impl Component for Header {
                         label()
                             .font_size(36.)
                             .font_weight(FontWeight::BOLD)
-                            .text(if self.hidden {
-                                "••••••".to_owned()
-                            } else {
-                                fmt::sats(self.mint.balance_sat)
-                            }),
+                            .text(fmt::sats(self.mint.balance_sat)),
                     )
                     .child(
                         label()

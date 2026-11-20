@@ -91,7 +91,7 @@ impl Component for WithdrawScreen {
                         .content(Content::flex())
                         .spacing(8.)
                         .child(
-                            Button::new()
+                            button()
                                 .width(Size::flex(1.))
                                 .outline()
                                 .on_press(move |_| {
@@ -103,7 +103,7 @@ impl Component for WithdrawScreen {
                         )
                         .maybe(cfg!(target_os = "android"), |el| {
                             el.child(
-                                Button::new()
+                                button()
                                     .width(Size::flex(1.))
                                     .outline()
                                     .on_press(|_| {

@@ -19,8 +19,7 @@ impl Component for HomeScreen {
     fn render(&self) -> impl IntoElement {
         let engine = use_engine();
         let refresh = use_refresh();
-        let settings = use_settings();
-        let mut adding = use_state(|| false);
+        let adding = use_state(|| false);
 
         let mints = use_future({
             let engine = engine.clone();
@@ -33,54 +32,30 @@ impl Component for HomeScreen {
 
         let body: Element = match &*mints.state() {
             FutureState::Fulfilled(Ok(list)) => {
-                let hidden = settings.read().hide_balance;
+                let total: u64 = list.iter().map(|m| m.balance_sat).sum();
                 rect()
                     .width(Size::fill())
-                    .spacing(20.)
+                    .spacing(24.)
+                    .child(Total { sats: total })
                     .child(
                         rect()
+                            .horizontal()
                             .width(Size::fill())
-                            .spacing(8.)
-                            .child(
-                                rect()
-                                    .horizontal()
-                                    .width(Size::fill())
-                                    .content(Content::flex())
-                                    .cross_align(Alignment::center())
-                                    .margin((0., 4.))
-                                    .child(
-                                        label()
-                                            .width(Size::flex(1.))
-                                            .font_size(18.)
-                                            .font_weight(FontWeight::BOLD)
-                                            .text("Mints"),
-                                    )
-                                    .child(
-                                        rect()
-                                            .padding(6.)
-                                            .corner_radius(16.)
-                                            .on_press(move |_| adding.set(!adding()))
-                                            .child(icon(
-                                                if adding() { lucide::x() } else { lucide::plus() },
-                                                22.,
-                                                ACCENT,
-                                            )),
-                                    ),
-                            )
-                            .maybe(list.is_empty(), |el| {
-                                el.child(empty_state("Add a mint to start using the wallet."))
-                            })
+                            .content(Content::wrap_spacing(12.))
+                            .spacing(12.)
                             .children(list.iter().map(|mint| {
                                 rect()
                                     .key(mint.url.clone())
-                                    .width(Size::fill())
-                                    .child(MintRow {
+                                    .child(MintCard {
                                         mint: mint.clone(),
-                                        hidden,
                                     })
                                     .into_element()
-                            })),
+                            }))
+                            .child(AddTile { adding }),
                     )
+                    .maybe(list.is_empty(), |el| {
+                        el.child(empty_state("Add a mint to start using the wallet."))
+                    })
                     .maybe(adding(), |el| el.child(AddMint { adding }))
                     .into_element()
             }
@@ -104,11 +79,8 @@ impl Component for HomeScreen {
 
 fn top_bar() -> Rect {
     rect()
-        .horizontal()
         .width(Size::fill())
         .padding((14., 0., 0., 0.))
-        .cross_align(Alignment::center())
-        .spacing(10.)
         .child(
             label()
                 .font_size(22.)
@@ -117,27 +89,54 @@ fn top_bar() -> Rect {
         )
 }
 
+/// The balance over every mint.
 #[derive(PartialEq)]
-struct MintRow {
-    mint: MintSummary,
-    hidden: bool,
+struct Total {
+    sats: u64,
 }
 
-impl Component for MintRow {
+impl Component for Total {
+    fn render(&self) -> impl IntoElement {
+        rect()
+            .width(Size::fill())
+            .spacing(2.)
+            .child(
+                label()
+                    .font_size(13.)
+                    .color(palette().text_secondary)
+                    .text("Balance"),
+            )
+            .child(
+                label()
+                    .font_size(40.)
+                    .font_weight(FontWeight::BOLD)
+                    .text(fmt::sats(self.sats)),
+            )
+    }
+}
+
+const CARD: f32 = 148.;
+
+/// A mint as a small square card, so they sit side by side and wrap.
+#[derive(PartialEq)]
+struct MintCard {
+    mint: MintSummary,
+}
+
+impl Component for MintCard {
     fn render(&self) -> impl IntoElement {
         let colors = palette();
         let selected = use_consume::<SelectedMint>().0;
         let mint = self.mint.clone();
         let url = mint.url.clone();
         rect()
-            .horizontal()
-            .width(Size::fill())
-            .content(Content::flex())
+            .width(Size::px(CARD))
+            .height(Size::px(CARD))
             .padding(14.)
-            .spacing(12.)
-            .corner_radius(16.)
+            .corner_radius(18.)
             .background(colors.surface_secondary)
-            .cross_align(Alignment::center())
+            .main_align(Alignment::space_between())
+            .cursor(CursorIcon::Pointer)
             .on_press({
                 let mut selected = selected;
                 move |_| {
@@ -145,18 +144,17 @@ impl Component for MintRow {
                     let _ = RouterContext::get().push(Route::Mint);
                 }
             })
-            .child(icon_badge(lucide::landmark(), 42., ACCENT, ACCENT.with_a(36)))
+            .child(icon(lucide::landmark(), 22., ACCENT))
             .child(
                 rect()
-                    .width(Size::flex(1.))
-                    .spacing(3.)
+                    .width(Size::fill())
+                    .spacing(2.)
                     .child(
                         label()
-                            .font_size(16.)
+                            .font_size(20.)
                             .font_weight(FontWeight::BOLD)
                             .max_lines(1)
-                            .text_overflow(TextOverflow::Ellipsis)
-                            .text(mint.name.clone()),
+                            .text(fmt::sats(mint.balance_sat)),
                     )
                     .child(
                         label()
@@ -164,19 +162,40 @@ impl Component for MintRow {
                             .color(colors.text_secondary)
                             .max_lines(1)
                             .text_overflow(TextOverflow::Ellipsis)
-                            .text(mint.url.clone()),
+                            .text(mint.name.clone()),
                     ),
             )
-            .child(
-                label()
-                    .font_size(16.)
-                    .font_weight(FontWeight::BOLD)
-                    .text(if self.hidden {
-                        "••••".to_owned()
-                    } else {
-                        fmt::sats(mint.balance_sat)
-                    }),
+    }
+}
+
+/// The last card of the grid: opens and closes the add-mint form.
+#[derive(PartialEq)]
+struct AddTile {
+    adding: State<bool>,
+}
+
+impl Component for AddTile {
+    fn render(&self) -> impl IntoElement {
+        let colors = palette();
+        let mut adding = self.adding;
+        rect()
+            .width(Size::px(CARD))
+            .height(Size::px(CARD))
+            .corner_radius(18.)
+            .border(
+                Border::new()
+                    .fill(colors.border)
+                    .width(1.)
+                    .alignment(BorderAlignment::Inner),
             )
+            .center()
+            .cursor(CursorIcon::Pointer)
+            .on_press(move |_| adding.set(!adding()))
+            .child(icon(
+                if adding() { lucide::x() } else { lucide::plus() },
+                26.,
+                colors.text_secondary,
+            ))
     }
 }
 

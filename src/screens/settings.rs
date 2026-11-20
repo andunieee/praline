@@ -11,7 +11,6 @@ pub struct SettingsScreen;
 impl Component for SettingsScreen {
     fn render(&self) -> impl IntoElement {
         let engine = use_engine();
-        let mut settings = use_settings();
         let mut show_phrase = use_state(|| false);
         let colors = palette();
         let relays = use_state({
@@ -19,7 +18,6 @@ impl Component for SettingsScreen {
             move || engine.relays().join(", ")
         });
         let mut relay_message = use_state(|| None::<Result<String, String>>);
-        let hide = settings.read().hide_balance;
 
         let phrase = if show_phrase() {
             engine.recovery_phrase()
@@ -36,31 +34,6 @@ impl Component for SettingsScreen {
                     .width(Size::fill())
                     .padding((4., 16., 24., 16.))
                     .spacing(20.)
-                    .child(section(
-                        "Display",
-                        rect().width(Size::fill()).child(
-                            rect()
-                                .horizontal()
-                                .width(Size::fill())
-                                .content(Content::flex())
-                                .padding((12., 0.))
-                                .cross_align(Alignment::center())
-                                .child(
-                                    rect()
-                                        .width(Size::flex(1.))
-                                        .child(label().text("Hide balances"))
-                                        .child(
-                                            label()
-                                                .font_size(12.)
-                                                .color(colors.text_secondary)
-                                                .text("Also by tapping the balance"),
-                                        ),
-                                )
-                                .child(Switch::new(WritableSetter::new(hide, move |hidden| {
-                                    settings.write().hide_balance = hidden
-                                }))),
-                        ),
-                    ))
                     .child(section(
                         "Nostr relays",
                         rect()
@@ -79,7 +52,7 @@ impl Component for SettingsScreen {
                                 Err(text) => notice(text, NEGATIVE),
                             }))
                             .child(
-                                Button::new()
+                                button()
                                     .outline()
                                     .on_press({
                                         let engine = engine.clone();
@@ -97,7 +70,7 @@ impl Component for SettingsScreen {
                                     .child("Save relays"),
                             )
                             .child(
-                                Button::new().outline().on_press({
+                                button().outline().on_press({
                                     let mut relays = relays;
                                     move |_| {
                                         relays.set(DEFAULT_RELAYS.join(", "));
@@ -125,7 +98,7 @@ impl Component for SettingsScreen {
                                     .text("These twelve words are the keys to your funds, at every mint and on Cassis. Write them down and keep them private."),
                             )
                             .child(
-                                Button::new()
+                                button()
                                     .outline()
                                     .on_press(move |_| show_phrase.set(!show_phrase()))
                                     .child(if show_phrase() { "Hide" } else { "Show" }),
