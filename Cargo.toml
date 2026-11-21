@@ -19,9 +19,9 @@ log = "0.4"
 freya-hypereffect = { path = "../freya-hypereffect" }
 freya-cop = "0.1.0"
 hypereffect = { path = "../hypereffect/rust/hypereffect" }
-cassis-core = { git = "https://github.com/andunieee/cassis", rev = "18fb852c298685a55d28264b689aa46b6f7e97bd" }
-cassis-networks = { git = "https://github.com/andunieee/cassis", rev = "18fb852c298685a55d28264b689aa46b6f7e97bd", features = ["cashu"] }
-cassis-wallet = { git = "https://github.com/andunieee/cassis", rev = "18fb852c298685a55d28264b689aa46b6f7e97bd", default-features = false, features = ["cashu"] }
+cassis-core = { git = "https://github.com/andunieee/cassis", rev = "91380cd118223c752e58921405e2e6b78d0814b2" }
+cassis-networks = { git = "https://github.com/andunieee/cassis", rev = "91380cd118223c752e58921405e2e6b78d0814b2", features = ["cashu"] }
+cassis-wallet = { git = "https://github.com/andunieee/cassis", rev = "91380cd118223c752e58921405e2e6b78d0814b2", default-features = false, features = ["cashu"] }
 cdk = { version = "0.17.3", default-features = false, features = ["wallet"] }
 orangedb = "0.3.0"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }

@@ -13,6 +13,7 @@ use serde_json::Value;
 use super::{
     Engine,
     htlc::CdkWallet,
+    invoice,
     mints::host_of,
     store::{Blob, BlobKey, CassisDirection, CassisStatus, CassisTx, CassisTxHash, CopSessionId, RouteHop, unix_now},
 };
@@ -101,7 +102,7 @@ fn hash_bytes(hex: &str) -> Option<[u8; 32]> {
     lowercase_hex::decode(hex).ok()?.try_into().ok()
 }
 
-fn sats_ceil(msat: u64) -> u64 {
+pub(crate) fn sats_ceil(msat: u64) -> u64 {
     msat.div_ceil(1000)
 }
 
@@ -338,33 +339,28 @@ impl Engine {
         self.run(async move {
             let network = cassis_network(&mint_url).ok_or("this mint is not on Cassis")?;
             let expires_at = unix_now() + expires_in.unwrap_or(15 * 60).clamp(60, 24 * 3600);
+            let (metadata, preimage) = invoice::issue(
+                &invoice::invoice_secret(&engine.0.seed),
+                invoice::Terms {
+                    amount_msat: amount_sat * 1000,
+                    expires_at,
+                    memo: memo.clone(),
+                    peer,
+                },
+            )?;
+            // Nothing of the invoice is kept: the metadata brings it back with the payment.
             let invoice = engine
                 .0
                 .node
-                .create_invoice(&[network], amount_sat * 1000, expires_at, memo.clone(), None)
-                .await?;
-            engine
-                .0
-                .db
-                .cassis_txes()
-                .upsert(&CassisTx {
-                    payment_hash: CassisTxHash(invoice.body.payment_hash.to_string()),
-                    mint_url,
-                    direction: CassisDirection::Received,
-                    amount_sat,
-                    fee_sat: 0,
-                    description: memo,
-                    peer,
-                    status: CassisStatus::Pending,
-                    error: None,
-                    route: Vec::new(),
-                    failed_hop: None,
-                    hop_error: None,
-                    cop_session: None,
-                    at: unix_now(),
+                .build_invoice(
+                    &[network],
+                    preimage.sha256(),
+                    amount_sat * 1000,
                     expires_at,
-                })
-                .map_err(|e| e.to_string())?;
+                    memo,
+                    Some(metadata),
+                )
+                .await?;
             serde_json::to_value(&invoice).map_err(|e| e.to_string())
         })
         .await

@@ -5,6 +5,7 @@
 //! runtime (cdk, iroh and reqwest need one) through [`Engine::run`].
 
 mod cassis;
+mod invoice;
 mod htlc;
 mod mints;
 mod proofs;
@@ -100,6 +101,7 @@ impl Engine {
             wallets: Mutex::default(),
             cassis_mints: Mutex::default(),
         }));
+        engine.0.node.set_preimage_releaser(invoice::releaser(&engine.0));
         engine.run_blocking(engine.clone().reopen_networks());
         engine.spawn_upkeep();
         Ok(engine)

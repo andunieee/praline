@@ -1288,7 +1288,7 @@ dependencies = [
 [[package]]
 name = "cassis-cashu"
 version = "0.1.0"
-source = "git+https://github.com/andunieee/cassis?rev=18fb852c298685a55d28264b689aa46b6f7e97bd#18fb852c298685a55d28264b689aa46b6f7e97bd"
+source = "git+https://github.com/andunieee/cassis?rev=91380cd118223c752e58921405e2e6b78d0814b2#91380cd118223c752e58921405e2e6b78d0814b2"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1306,7 +1306,7 @@ dependencies = [
 [[package]]
 name = "cassis-core"
 version = "0.1.0"
-source = "git+https://github.com/andunieee/cassis?rev=18fb852c298685a55d28264b689aa46b6f7e97bd#18fb852c298685a55d28264b689aa46b6f7e97bd"
+source = "git+https://github.com/andunieee/cassis?rev=91380cd118223c752e58921405e2e6b78d0814b2#91380cd118223c752e58921405e2e6b78d0814b2"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1335,7 +1335,7 @@ dependencies = [
 [[package]]
 name = "cassis-networks"
 version = "0.1.0"
-source = "git+https://github.com/andunieee/cassis?rev=18fb852c298685a55d28264b689aa46b6f7e97bd#18fb852c298685a55d28264b689aa46b6f7e97bd"
+source = "git+https://github.com/andunieee/cassis?rev=91380cd118223c752e58921405e2e6b78d0814b2#91380cd118223c752e58921405e2e6b78d0814b2"
 dependencies = [
  "cassis-cashu",
  "cassis-core",
@@ -1345,8 +1345,9 @@ dependencies = [
 [[package]]
 name = "cassis-wallet"
 version = "0.1.0"
-source = "git+https://github.com/andunieee/cassis?rev=18fb852c298685a55d28264b689aa46b6f7e97bd#18fb852c298685a55d28264b689aa46b6f7e97bd"
+source = "git+https://github.com/andunieee/cassis?rev=91380cd118223c752e58921405e2e6b78d0814b2#91380cd118223c752e58921405e2e6b78d0814b2"
 dependencies = [
+ "async-trait",
  "cassis-core",
  "cassis-networks",
  "clap",
