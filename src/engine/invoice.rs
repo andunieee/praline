@@ -1,18 +1,18 @@
 //! Cassis invoices the wallet keeps no record of.
 //!
-//! What an invoice needs to be paid is in its metadata: a random nonce, the amount, the expiry and
-//! the memo and peer of the history. The preimage is a hash of the wallet's static secret and
-//! those bytes, so the payment hash commits to all of it, and no one but this wallet can work the
-//! preimage out. When a PREPARE or COMMIT brings the metadata back the wallet derives the preimage
-//! again and checks it against the payment hash, which is all it takes to know the invoice is its
-//! own and the terms were not changed.
+//! What an invoice needs to be paid is in its metadata: a version byte, a random nonce, the amount,
+//! the expiry and the memo and peer of the history. The preimage is an HMAC of those bytes under the
+//! wallet's static secret, so the payment hash commits to all of it, and no one but this wallet can
+//! work the preimage out. When a PREPARE or COMMIT brings the metadata back the wallet derives the
+//! preimage again and checks it against the payment hash, which is all it takes to know the invoice
+//! is its own and the terms were not changed.
 
 use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
 use cassis_core::{Bytes32, protocol::{Commit, Metadata, PreparePayee}};
 use cassis_wallet::node::{PreimageReleaser, Released};
-use cdk::secp256k1::hashes::{Hash, sha256};
+use cdk::secp256k1::hashes::{Hash, HashEngine, hmac, sha256};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -24,14 +24,19 @@ use super::{
 /// Tags the derivation of the static secret invoice preimages are made with.
 const INVOICE_SECRET_TAG: &[u8] = b"praline/cassis-invoice-preimage";
 
-/// The secret every invoice's preimage is hashed with.
+/// The layout of the metadata, its first byte.
+const VERSION: u8 = 1;
+/// The version, the nonce, the amount and the expiry; the notes follow.
+const HEADER_LEN: usize = 1 + 16 + 8 + 8;
+
+/// The secret every invoice's preimage is keyed with.
 pub(crate) fn invoice_secret(seed: &[u8; 64]) -> [u8; 32] {
     let mut tagged = INVOICE_SECRET_TAG.to_vec();
     tagged.extend_from_slice(seed);
     sha256::Hash::hash(&tagged).to_byte_array()
 }
 
-/// What the metadata says, after the nonce and the amount and expiry.
+/// What the metadata says, after the header.
 #[derive(Serialize, Deserialize, Default)]
 struct Notes {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -41,6 +46,7 @@ struct Notes {
 }
 
 /// The terms of an invoice, as its metadata carries them.
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Terms {
     pub amount_msat: u64,
     pub expires_at: u64,
@@ -48,10 +54,10 @@ pub(crate) struct Terms {
     pub peer: Option<String>,
 }
 
-/// An invoice's metadata and the preimage it makes: random, so no two invoices share a hash.
-pub(crate) fn issue(secret: &[u8; 32], terms: Terms) -> Result<(Metadata, Bytes32), String> {
-    let mut bytes = Vec::with_capacity(32);
-    bytes.extend_from_slice(&fastrand::u128(..).to_be_bytes());
+fn encode(nonce: [u8; 16], terms: Terms) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::with_capacity(HEADER_LEN);
+    bytes.push(VERSION);
+    bytes.extend_from_slice(&nonce);
     bytes.extend_from_slice(&terms.amount_msat.to_be_bytes());
     bytes.extend_from_slice(&terms.expires_at.to_be_bytes());
     let notes = Notes {
@@ -61,14 +67,40 @@ pub(crate) fn issue(secret: &[u8; 32], terms: Terms) -> Result<(Metadata, Bytes3
     if notes.memo.is_some() || notes.peer.is_some() {
         bytes.extend(serde_json::to_vec(&notes).map_err(|e| e.to_string())?);
     }
+    Ok(bytes)
+}
+
+fn decode(bytes: &[u8]) -> Option<Terms> {
+    if bytes.len() < HEADER_LEN || bytes[0] != VERSION {
+        return None;
+    }
+    let amount_msat = u64::from_be_bytes(bytes[17..25].try_into().ok()?);
+    let expires_at = u64::from_be_bytes(bytes[25..33].try_into().ok()?);
+    let notes: Notes = match &bytes[HEADER_LEN..] {
+        [] => Notes::default(),
+        json => serde_json::from_slice(json).ok()?,
+    };
+    Some(Terms {
+        amount_msat,
+        expires_at,
+        memo: notes.memo,
+        peer: notes.peer,
+    })
+}
+
+/// An invoice's metadata and the preimage it makes: random, so no two invoices share a hash.
+pub(crate) fn issue(secret: &[u8; 32], terms: Terms) -> Result<(Metadata, Bytes32), String> {
+    let mut nonce = [0; 16];
+    getrandom::fill(&mut nonce).map_err(|e| format!("no randomness: {e}"))?;
+    let bytes = encode(nonce, terms)?;
     let preimage = preimage_of(secret, &bytes);
     Ok((Metadata::new(bytes)?, preimage))
 }
 
 fn preimage_of(secret: &[u8; 32], metadata: &[u8]) -> Bytes32 {
-    let mut bytes = secret.to_vec();
-    bytes.extend_from_slice(metadata);
-    Bytes32(sha256::Hash::hash(&bytes).to_byte_array())
+    let mut engine = hmac::HmacEngine::<sha256::Hash>::new(secret);
+    engine.input(metadata);
+    Bytes32(hmac::Hmac::<sha256::Hash>::from_engine(engine).to_byte_array())
 }
 
 /// The preimage and terms of the invoice for `hash` that `metadata` belongs to, if it is one of
@@ -79,32 +111,15 @@ fn open(
     metadata: Option<&Metadata>,
 ) -> Option<(Bytes32, Terms)> {
     let bytes = metadata?.as_bytes();
-    if bytes.len() < 32 {
-        return None;
-    }
     let preimage = preimage_of(secret, bytes);
     if !hash.matches_preimage(&preimage) {
         return None;
     }
-    let amount_msat = u64::from_be_bytes(bytes[16..24].try_into().ok()?);
-    let expires_at = u64::from_be_bytes(bytes[24..32].try_into().ok()?);
-    if expires_at <= unix_now() {
+    let terms = decode(bytes)?;
+    if terms.expires_at <= unix_now() {
         return None;
     }
-    let notes: Notes = if bytes.len() > 32 {
-        serde_json::from_slice(&bytes[32..]).ok()?
-    } else {
-        Notes::default()
-    };
-    Some((
-        preimage,
-        Terms {
-            amount_msat,
-            expires_at,
-            memo: notes.memo,
-            peer: notes.peer,
-        },
-    ))
+    Some((preimage, terms))
 }
 
 /// Answers the PREPARE and COMMIT of the invoices made with [`issue`].

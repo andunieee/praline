@@ -75,16 +75,17 @@ pub const DEFAULT_RELAYS: &[&str] = &[
 
 const RELAYS_KEY: &str = "setting/relays";
 
-/// A relay as typed, as a `wss://` URL.
+/// A relay as typed, as a `wss://` URL. A bare host gets `wss://`; any scheme but `ws` and `wss`
+/// is not a relay.
 pub fn normalize_relay(relay: &str) -> Option<String> {
     let relay = relay.trim().trim_end_matches('/');
     if relay.is_empty() || relay.contains(char::is_whitespace) {
         return None;
     }
-    if relay.starts_with("wss://") || relay.starts_with("ws://") {
-        Some(relay.to_owned())
-    } else {
-        Some(format!("wss://{relay}"))
+    match relay.split_once("://") {
+        Some(("wss" | "ws", host)) if !host.is_empty() => Some(relay.to_owned()),
+        Some(_) => None,
+        None => Some(format!("wss://{relay}")),
     }
 }
 
@@ -134,7 +135,9 @@ impl Engine {
     }
 
     /// Keep the relays to read Cassis routes from. At least one is needed.
-    pub fn set_relays(&self, relays: Vec<String>) -> Result<(), String> {
+    pub fn set_relays(&self, mut relays: Vec<String>) -> Result<(), String> {
+        let mut seen = HashSet::new();
+        relays.retain(|relay| seen.insert(relay.clone()));
         if relays.is_empty() {
             return Err("Add at least one relay.".into());
         }
@@ -162,18 +165,18 @@ impl Engine {
 
     fn try_open_cassis(&self, mint_url: &str) -> Result<(), String> {
         let network = cassis_network(mint_url).ok_or("its address is not a plain host")?;
-        if !self
-            .0
-            .cassis_mints
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(mint_url.to_owned())
-        {
+        if self.on_cassis(mint_url) {
             return Ok(());
         }
         let wallet = Arc::new(CdkWallet::new(network.clone(), self.wallet(mint_url)?, &self.0.seed));
         self.0.node.set_funder(network.clone(), wallet.clone());
         self.0.node.set_receiver(network, wallet);
+        // Only now: a mint that failed to open is tried again the next time.
+        self.0
+            .cassis_mints
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(mint_url.to_owned());
         Ok(())
     }
 
