@@ -88,15 +88,16 @@ const RELAYS_KEY: &str = "setting/relays";
 /// A relay as typed, as a `wss://` URL. A bare host gets `wss://`; any scheme but `ws` and `wss`
 /// is not a relay.
 pub fn normalize_relay(relay: &str) -> Option<String> {
-    let relay = relay.trim().trim_end_matches('/');
-    if relay.is_empty() || relay.contains(char::is_whitespace) {
+    let relay = relay.trim();
+    if relay.contains(char::is_whitespace) {
         return None;
     }
-    match relay.split_once("://") {
-        Some(("wss" | "ws", host)) if !host.is_empty() => Some(relay.to_owned()),
-        Some(_) => None,
-        None => Some(format!("wss://{relay}")),
+    let (scheme, host) = relay.split_once("://").unwrap_or(("wss", relay));
+    let host = host.trim_end_matches('/');
+    if host.is_empty() || !matches!(scheme, "wss" | "ws") {
+        return None;
     }
+    Some(format!("{scheme}://{host}"))
 }
 
 fn route_hop(hop: &RouteAnnouncement) -> RouteHop {
@@ -378,5 +379,39 @@ impl Engine {
             }
             let _ = self.0.db.cassis_txes().upsert(&row);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_relays() {
+        assert_eq!(normalize_relay("nos.lol").as_deref(), Some("wss://nos.lol"));
+        assert_eq!(normalize_relay("  wss://relay.primal.net/ ").as_deref(), Some("wss://relay.primal.net"));
+        assert_eq!(normalize_relay("ws://localhost:7777").as_deref(), Some("ws://localhost:7777"));
+        assert_eq!(normalize_relay("https://relay.example.com"), None);
+        assert_eq!(normalize_relay("wss://"), None);
+        assert_eq!(normalize_relay(""), None);
+        assert_eq!(normalize_relay("nos .lol"), None);
+    }
+
+    #[test]
+    fn only_mints_at_the_root_of_their_host_are_on_cassis() {
+        let network = cassis_network("https://mint.example.com").unwrap();
+        assert_eq!(network.0, "cashu::mint.example.com");
+        assert_eq!(cassis_network("https://mint.example.com/"), Some(network));
+        assert_eq!(cassis_network("https://mint.example.com/sat"), None);
+        // The network names a host, and the host an https URL.
+        assert_eq!(cassis_network("http://mint.example.com"), None);
+    }
+
+    #[test]
+    fn decodes_payment_hashes() {
+        let hash = [0xab; 32];
+        assert_eq!(hash_bytes(&lowercase_hex::encode(hash)), Some(hash));
+        assert_eq!(hash_bytes("abab"), None);
+        assert_eq!(hash_bytes("not hex"), None);
     }
 }

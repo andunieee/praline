@@ -183,3 +183,118 @@ pub(crate) fn releaser(inner: &Arc<Inner>) -> Arc<Releaser> {
         secret: invoice_secret(&inner.seed),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SECRET: [u8; 32] = [7; 32];
+
+    fn terms(expires_at: u64) -> Terms {
+        Terms {
+            amount_msat: 21_000,
+            expires_at,
+            memo: Some("Two coffees".into()),
+            peer: Some("Café".into()),
+        }
+    }
+
+    fn later() -> u64 {
+        unix_now() + 600
+    }
+
+    #[test]
+    fn opens_what_it_issued() {
+        let terms = terms(later());
+        let (metadata, preimage) = issue(&SECRET, terms.clone()).unwrap();
+        let (opened, back) = open(&SECRET, &preimage.sha256(), Some(&metadata)).unwrap();
+        assert_eq!(opened, preimage);
+        assert_eq!(back, terms);
+    }
+
+    #[test]
+    fn opens_an_invoice_without_notes() {
+        let terms = Terms {
+            memo: None,
+            peer: None,
+            ..terms(later())
+        };
+        let (metadata, preimage) = issue(&SECRET, terms.clone()).unwrap();
+        assert_eq!(metadata.as_bytes().len(), HEADER_LEN);
+        let (_, back) = open(&SECRET, &preimage.sha256(), Some(&metadata)).unwrap();
+        assert_eq!(back, terms);
+    }
+
+    #[test]
+    fn refuses_changed_terms() {
+        let (metadata, preimage) = issue(&SECRET, terms(later())).unwrap();
+        let hash = preimage.sha256();
+        // Every byte is covered: the version, the nonce, the amount, the expiry and the notes.
+        for i in 0..metadata.as_bytes().len() {
+            let mut bytes = metadata.as_bytes().to_vec();
+            bytes[i] ^= 1;
+            let changed = Metadata::new(bytes).unwrap();
+            assert!(open(&SECRET, &hash, Some(&changed)).is_none(), "byte {i}");
+        }
+    }
+
+    #[test]
+    fn refuses_longer_metadata() {
+        let (metadata, preimage) = issue(&SECRET, terms(later())).unwrap();
+        let mut bytes = metadata.as_bytes().to_vec();
+        bytes.extend_from_slice(b"\x80\0\0\0");
+        let longer = Metadata::new(bytes).unwrap();
+        assert!(open(&SECRET, &preimage.sha256(), Some(&longer)).is_none());
+    }
+
+    #[test]
+    fn refuses_another_wallets_invoice() {
+        let (metadata, preimage) = issue(&[8; 32], terms(later())).unwrap();
+        assert!(open(&SECRET, &preimage.sha256(), Some(&metadata)).is_none());
+    }
+
+    #[test]
+    fn refuses_another_hash_or_no_metadata() {
+        let (metadata, preimage) = issue(&SECRET, terms(later())).unwrap();
+        assert!(open(&SECRET, &preimage, Some(&metadata)).is_none());
+        assert!(open(&SECRET, &preimage.sha256(), None).is_none());
+    }
+
+    #[test]
+    fn refuses_an_expired_invoice() {
+        let (metadata, preimage) = issue(&SECRET, terms(unix_now() - 1)).unwrap();
+        assert!(open(&SECRET, &preimage.sha256(), Some(&metadata)).is_none());
+    }
+
+    #[test]
+    fn no_two_invoices_share_a_hash() {
+        let (_, first) = issue(&SECRET, terms(1_900_000_000)).unwrap();
+        let (_, second) = issue(&SECRET, terms(1_900_000_000)).unwrap();
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn decodes_only_its_own_layout() {
+        let bytes = encode([0; 16], terms(1_900_000_000)).unwrap();
+        assert_eq!(decode(&bytes), Some(terms(1_900_000_000)));
+        assert_eq!(decode(&bytes[..HEADER_LEN - 1]), None);
+        let mut other = bytes.clone();
+        other[0] = VERSION + 1;
+        assert_eq!(decode(&other), None);
+    }
+
+    #[test]
+    fn preimage_is_an_hmac() {
+        // `hmac.new(bytes([7] * 32), b"praline", hashlib.sha256).hexdigest()`
+        assert_eq!(
+            preimage_of(&SECRET, b"praline").to_string(),
+            "363f02645effcf08215cad2cd0d87cae0e04f31d55973981eaa61182fe2ef836"
+        );
+    }
+
+    #[test]
+    fn secret_depends_on_the_seed() {
+        assert_eq!(invoice_secret(&[1; 64]), invoice_secret(&[1; 64]));
+        assert_ne!(invoice_secret(&[1; 64]), invoice_secret(&[2; 64]));
+    }
+}

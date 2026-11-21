@@ -204,3 +204,34 @@ impl HtlcReceiver for CdkWallet {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn derived_keys_have_even_y_and_keep_their_x() {
+        // Half of the seeds give an odd key before it is negated.
+        for byte in 0..32u8 {
+            let seed = [byte; 64];
+            for tag in [REFUND_KEY_TAG, CLAIM_KEY_TAG] {
+                let key = derive_key(&seed, tag);
+                assert_eq!(key.public_key().to_bytes()[0], 0x02, "seed {byte}");
+
+                let mut tagged = tag.to_vec();
+                tagged.extend_from_slice(&seed);
+                let raw = SecretKey::from_slice(sha256::Hash::hash(&tagged).as_byte_array()).unwrap();
+                assert_eq!(raw.public_key().to_bytes()[1..], key.public_key().to_bytes()[1..]);
+            }
+        }
+    }
+
+    #[test]
+    fn derived_keys_are_stable_and_apart() {
+        let seed = [3; 64];
+        let refund = derive_key(&seed, REFUND_KEY_TAG);
+        assert_eq!(refund.to_secret_bytes(), derive_key(&seed, REFUND_KEY_TAG).to_secret_bytes());
+        assert_ne!(refund.to_secret_bytes(), derive_key(&seed, CLAIM_KEY_TAG).to_secret_bytes());
+        assert_ne!(refund.to_secret_bytes(), derive_key(&[4; 64], REFUND_KEY_TAG).to_secret_bytes());
+    }
+}
