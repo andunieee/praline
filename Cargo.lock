@@ -6322,7 +6322,6 @@ dependencies = [
  "cassis-wallet",
  "cdk",
  "env_logger",
- "fastrand",
  "freya",
  "freya-cop",
  "freya-hypereffect",

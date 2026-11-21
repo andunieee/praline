@@ -84,7 +84,7 @@ impl Skin for PralineSkin {
             .cross_align(Alignment::center())
             .maybe(props.enabled, |el| {
                 el.cursor(CursorIcon::Pointer)
-                    .on_pointer_down(move |_: Event<PointerEventData>| on_toggle.call(()))
+                    .on_press(move |_| on_toggle.call(()))
             })
             .child(
                 rect()

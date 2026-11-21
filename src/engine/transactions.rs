@@ -7,7 +7,7 @@ use cdk::{
 };
 
 use super::{
-    Engine, FLOAT_MEMO,
+    Engine,
     mints::host_of,
     store::{CassisDirection, CassisStatus},
 };
@@ -90,9 +90,6 @@ impl Engine {
                 .await
                 .map_err(|e| e.to_string())?;
             for t in cdk {
-                if t.memo.as_deref() == Some(FLOAT_MEMO) {
-                    continue;
-                }
                 let incoming = t.direction == TransactionDirection::Incoming;
                 let lightning = t.quote_id.is_some();
                 let onchain = t.payment_method.as_ref().is_some_and(|m| m.is_onchain());

@@ -92,6 +92,31 @@ pub fn page_header(title: impl Into<String>, back: bool) -> Rect {
         )
 }
 
+/// The title of a list on a screen.
+pub fn heading(text: &'static str) -> Label {
+    label()
+        .font_size(18.)
+        .font_weight(FontWeight::BOLD)
+        .margin((0., 4.))
+        .text(text)
+}
+
+/// A rounded surface with `rows` under each other, divided.
+pub fn card(rows: Vec<Rect>) -> Rect {
+    rect()
+        .width(Size::fill())
+        .padding((4., 14.))
+        .corner_radius(16.)
+        .background(palette().surface_secondary)
+        .children(rows.into_iter().enumerate().map(|(i, row)| {
+            rect()
+                .width(Size::fill())
+                .maybe(i > 0, |el| el.child(divider()))
+                .child(row)
+                .into_element()
+        }))
+}
+
 /// A titled group of content on a rounded surface.
 pub fn section(title: &'static str, content: impl Into<Element>) -> Rect {
     let colors = palette();

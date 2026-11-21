@@ -6,8 +6,7 @@
 
 use std::{collections::HashSet, sync::Arc};
 
-use cassis_core::{Invoice, NetworkId};
-use cassis_core::routing::RouteAnnouncement;
+use cassis_core::{Invoice, NetworkId, routing::RouteAnnouncement, sats_for_msat};
 use serde_json::Value;
 
 use super::{
@@ -15,7 +14,7 @@ use super::{
     htlc::CdkWallet,
     invoice,
     mints::host_of,
-    store::{Blob, BlobKey, CassisDirection, CassisStatus, CassisTx, CassisTxHash, CopSessionId, RouteHop, unix_now},
+    store::{Blob, BlobKey, CassisDirection, CassisStatus, CassisTx, CopSessionId, RouteHop, unix_now},
 };
 
 /// What paying an invoice would do, for the wallet's payment screen. Everything here comes from
@@ -45,6 +44,17 @@ pub struct PayOption {
     pub balance_sat: u64,
     /// Whether the balance covers the invoice with room for the mint's fees.
     pub enough: bool,
+}
+
+/// What the history keeps of a payment besides the invoice.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PaymentNotes {
+    /// Who it is paid to, as the server called itself.
+    pub peer: Option<String>,
+    /// Shown in place of the invoice's description.
+    pub memo: Option<String>,
+    /// The COP session it is paid in.
+    pub cop_session: Option<String>,
 }
 
 /// An invoice that was paid.
@@ -103,10 +113,6 @@ fn hash_bytes(hex: &str) -> Option<[u8; 32]> {
     lowercase_hex::decode(hex).ok()?.try_into().ok()
 }
 
-pub(crate) fn sats_ceil(msat: u64) -> u64 {
-    msat.div_ceil(1000)
-}
-
 /// The most the mint's fees can add to paying `amount_sat`: a percent, and a few sats.
 fn fee_room(amount_sat: u64) -> u64 {
     amount_sat.div_ceil(100) + 3
@@ -115,11 +121,7 @@ fn fee_room(amount_sat: u64) -> u64 {
 impl Engine {
     /// Whether the mint pays and is paid with Cassis.
     pub(crate) fn on_cassis(&self, mint_url: &str) -> bool {
-        self.0
-            .cassis_mints
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .contains(mint_url)
+        self.0.cassis_mints().contains(mint_url)
     }
 
     /// The nostr relays Cassis routes are read from.
@@ -172,11 +174,7 @@ impl Engine {
         self.0.node.set_funder(network.clone(), wallet.clone());
         self.0.node.set_receiver(network, wallet);
         // Only now: a mint that failed to open is tried again the next time.
-        self.0
-            .cassis_mints
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(mint_url.to_owned());
+        self.0.cassis_mints().insert(mint_url.to_owned());
         Ok(())
     }
 
@@ -197,16 +195,9 @@ impl Engine {
         let invoice: Invoice =
             serde_json::from_value(invoice).map_err(|e| format!("not a Cassis invoice: {e}"))?;
         invoice.verify()?;
-        let amount_sat = sats_ceil(invoice.body.amount_msat);
+        let amount_sat = sats_for_msat(invoice.body.amount_msat);
         // Any mint on Cassis can pay: if the invoice is not on its network, the payment is routed.
-        let urls: Vec<String> = self
-            .0
-            .cassis_mints
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .iter()
-            .cloned()
-            .collect();
+        let urls: Vec<String> = self.0.cassis_mints().iter().cloned().collect();
         let mut options = Vec::new();
         for url in urls {
             let summary = self.mint_summary(&url).await?;
@@ -228,15 +219,12 @@ impl Engine {
         })
     }
 
-    /// Pay an offer from the mint at `mint_url`. `peer` is who it is paid to, as the server
-    /// called itself, for the transaction list.
+    /// Pay an offer from the mint at `mint_url`, noting `notes` in the history.
     pub async fn pay(
         &self,
         offer: &PaymentOffer,
         mint_url: &str,
-        peer: Option<String>,
-        memo: Option<String>,
-        cop_session: Option<String>,
+        notes: PaymentNotes,
     ) -> Result<PaidInvoice, String> {
         let (engine, offer, mint_url) = (self.clone(), offer.clone(), mint_url.to_owned());
         self.run(async move {
@@ -244,26 +232,21 @@ impl Engine {
             let hash = offer.invoice.body.payment_hash.to_string();
             let before = engine.balance(&mint_url).await?;
 
-            let row = CassisTx {
-                payment_hash: CassisTxHash(hash.clone()),
-                mint_url: mint_url.clone(),
-                direction: CassisDirection::Sent,
-                amount_sat: offer.amount_sat,
-                fee_sat: 0,
-                description: memo.or_else(|| offer.description.clone()),
-                peer,
-                status: CassisStatus::Pending,
-                error: None,
-                route: Vec::new(),
-                failed_hop: None,
-                hop_error: None,
-                cop_session: cop_session.map(CopSessionId),
-                at: unix_now(),
-                expires_at: offer.expires_at,
+            let mut row = CassisTx {
+                description: notes.memo.or_else(|| offer.description.clone()),
+                peer: notes.peer,
+                cop_session: notes.cop_session.map(CopSessionId),
+                ..CassisTx::pending(
+                    hash,
+                    mint_url.clone(),
+                    CassisDirection::Sent,
+                    offer.amount_sat,
+                    offer.expires_at,
+                )
             };
             engine.0.db.cassis_txes().upsert(&row).map_err(|e| e.to_string())?;
 
-            // The HTLC is funded from the mint's cdk wallet, see [`funder::CdkFunder`].
+            // The HTLC is funded from the mint's cdk wallet, see [`CdkWallet`].
             let outcome = async {
                 engine
                     .0
@@ -273,7 +256,6 @@ impl Engine {
             }
             .await;
 
-            let mut row = row;
             // A payment that could not start has no route; otherwise the report says how far it got.
             let outcome = match outcome {
                 Ok(report) => {

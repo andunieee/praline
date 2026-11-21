@@ -5,7 +5,7 @@ use freya::{
 
 use crate::{
     app::Route,
-    engine::{MintProofs, MintSummary, ProofHolder},
+    engine::{MintProofs, MintSummary},
     fmt,
     state::SelectedMint,
     ui::*,
@@ -96,30 +96,6 @@ impl Component for MintScreen {
     }
 }
 
-fn heading(text: &'static str) -> Label {
-    label()
-        .font_size(18.)
-        .font_weight(FontWeight::BOLD)
-        .margin((0., 4.))
-        .text(text)
-}
-
-/// A rounded surface with `rows` under each other, divided.
-fn card(rows: Vec<Rect>) -> Rect {
-    rect()
-        .width(Size::fill())
-        .padding((4., 14.))
-        .corner_radius(16.)
-        .background(palette().surface_secondary)
-        .children(rows.into_iter().enumerate().map(|(i, row)| {
-            rect()
-                .width(Size::fill())
-                .maybe(i > 0, |el| el.child(divider()))
-                .child(row)
-                .into_element()
-        }))
-}
-
 /// One proof: what it is worth on the right, and what to know about it under `title`.
 fn proof_row(title: String, detail: String, amount_sat: u64) -> Rect {
     let colors = palette();
@@ -162,7 +138,7 @@ fn locked_proofs(proofs: &MintProofs) -> Rect {
                 .iter()
                 .map(|p| {
                     proof_row(
-                        format!("HTLC …{}", &p.payment_hash[p.payment_hash.len().saturating_sub(8)..]),
+                        format!("HTLC {}", fmt::short(&p.payment_hash)),
                         format!("Refundable {}", fmt::when(p.refundable_at)),
                         p.amount_sat,
                     )
@@ -184,12 +160,8 @@ fn held_proofs(proofs: &MintProofs) -> Rect {
                     .held
                     .iter()
                     .map(|p| {
-                        let holder = match p.holder {
-                            ProofHolder::Wallet => "Wallet",
-                            ProofHolder::Cassis => "Cassis",
-                        };
-                        let state = if p.reserved { " · in use" } else { "" };
-                        proof_row(holder.to_owned(), format!("Keyset {}{state}", p.keyset), p.amount_sat)
+                        let state = if p.reserved { "In use" } else { "Spendable" };
+                        proof_row(state.to_owned(), format!("Keyset {}", p.keyset), p.amount_sat)
                     })
                     .collect(),
             )

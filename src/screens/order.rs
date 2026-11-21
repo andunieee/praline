@@ -19,6 +19,7 @@ use freya_cop::{
 use crate::{
     engine::{
         Engine,
+        PaymentNotes,
         PaymentOffer,
         store::{
             CopSession as StoredSession,
@@ -280,26 +281,19 @@ impl Component for PayCard {
         let can_pay = current.as_ref().is_some_and(|o| o.enough) && !busy();
 
         let pay = {
-            let (engine, offer, memo, peer, cop_session) = (
-                engine.clone(),
-                offer.clone(),
-                self.memo.clone(),
-                self.peer.clone(),
-                self.cop_session.clone(),
-            );
+            let (engine, offer) = (engine.clone(), offer.clone());
+            let notes = PaymentNotes {
+                peer: self.peer.clone(),
+                memo: self.memo.clone(),
+                cop_session: Some(self.cop_session.clone()),
+            };
             let current = current.clone();
             move |_| {
                 let Some(option) = current.clone() else { return };
                 busy.set(true);
-                let (engine, offer, memo, peer, cop_session) = (
-                    engine.clone(),
-                    offer.clone(),
-                    memo.clone(),
-                    peer.clone(),
-                    cop_session.clone(),
-                );
+                let (engine, offer, notes) = (engine.clone(), offer.clone(), notes.clone());
                 spawn(async move {
-                    let outcome = engine.pay(&offer, &option.mint_url, peer, memo, Some(cop_session)).await;
+                    let outcome = engine.pay(&offer, &option.mint_url, notes).await;
                     bump(refresh);
                     busy.set(false);
                     state.set(Some(Sheet::Message(outcome.map(|paid| {

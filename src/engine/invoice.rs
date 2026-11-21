@@ -10,15 +10,15 @@
 use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
-use cassis_core::{Bytes32, protocol::{Commit, Metadata, PreparePayee}};
+use cassis_core::{Bytes32, protocol::{Commit, Metadata, PreparePayee}, sats_for_msat};
 use cassis_wallet::node::{PreimageReleaser, Released};
 use cdk::secp256k1::hashes::{Hash, HashEngine, hmac, sha256};
 use serde::{Deserialize, Serialize};
 
 use super::{
     Inner,
-    cassis::{cassis_network, sats_ceil},
-    store::{CassisDirection, CassisStatus, CassisTx, CassisTxHash, unix_now},
+    cassis::cassis_network,
+    store::{CassisDirection, CassisTx, CassisTxHash, unix_now},
 };
 
 /// Tags the derivation of the static secret invoice preimages are made with.
@@ -155,9 +155,7 @@ impl Releaser {
             return;
         }
         let Some(mint_url) = inner
-            .cassis_mints
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .cassis_mints()
             .iter()
             .find(|url| cassis_network(url).is_some_and(|n| n == commit.network))
             .cloned()
@@ -165,21 +163,15 @@ impl Releaser {
             return;
         };
         let _ = inner.db.cassis_txes().upsert(&CassisTx {
-            payment_hash: hash,
-            mint_url,
-            direction: CassisDirection::Received,
-            amount_sat: sats_ceil(terms.amount_msat),
-            fee_sat: 0,
             description: terms.memo.clone(),
             peer: terms.peer.clone(),
-            status: CassisStatus::Pending,
-            error: None,
-            route: Vec::new(),
-            failed_hop: None,
-            hop_error: None,
-            cop_session: None,
-            at: unix_now(),
-            expires_at: terms.expires_at,
+            ..CassisTx::pending(
+                hash.0,
+                mint_url,
+                CassisDirection::Received,
+                sats_for_msat(terms.amount_msat),
+                terms.expires_at,
+            )
         });
     }
 }

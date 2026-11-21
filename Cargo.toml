@@ -12,7 +12,6 @@ freya = { path = "../freya/crates/freya", features = [
 ] }
 freya-winit = { path = "../freya/crates/freya-winit" }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
-fastrand = "2"
 getrandom = "0.3"
 async-io = "2"
 async-channel = "2"

@@ -10,21 +10,11 @@ use cdk::{
 
 use super::{Engine, cassis::cassis_network};
 
-/// Where a proof is kept.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ProofHolder {
-    /// The cdk wallet.
-    Wallet,
-    /// The mint's Cassis side.
-    Cassis,
-}
-
-/// A proof of a mint, as the lists show it.
+/// A proof the cdk wallet holds at a mint, as the lists show it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProofView {
     pub amount_sat: u64,
     pub keyset: String,
-    pub holder: ProofHolder,
     /// Whether it is set aside for an operation that is under way.
     pub reserved: bool,
 }
@@ -67,7 +57,6 @@ impl Engine {
                 .map(|p| ProofView {
                     amount_sat: u64::from(p.proof.amount),
                     keyset: p.proof.keyset_id.to_string(),
-                    holder: ProofHolder::Wallet,
                     reserved: p.state != State::Unspent,
                 })
                 .collect();

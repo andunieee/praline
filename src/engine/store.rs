@@ -654,6 +654,35 @@ impl WalletDatabase<Error> for CdkStore {
     }
 }
 
+impl CassisTx {
+    /// A payment under way, with nothing known of it yet but its terms.
+    pub fn pending(
+        payment_hash: String,
+        mint_url: String,
+        direction: CassisDirection,
+        amount_sat: u64,
+        expires_at: u64,
+    ) -> Self {
+        Self {
+            payment_hash: CassisTxHash(payment_hash),
+            mint_url,
+            direction,
+            amount_sat,
+            fee_sat: 0,
+            description: None,
+            peer: None,
+            status: CassisStatus::Pending,
+            error: None,
+            route: Vec::new(),
+            failed_hop: None,
+            hop_error: None,
+            cop_session: None,
+            at: unix_now(),
+            expires_at,
+        }
+    }
+}
+
 pub fn unix_now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

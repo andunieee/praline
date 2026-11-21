@@ -5,8 +5,8 @@
 //! runtime (cdk, iroh and reqwest need one) through [`Engine::run`].
 
 mod cassis;
-mod invoice;
 mod htlc;
+mod invoice;
 mod mints;
 mod proofs;
 pub mod store;
@@ -16,21 +16,17 @@ use std::{
     collections::{HashMap, HashSet},
     future::Future,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use cassis_wallet::{Home, Node, NodeConfig};
 use cdk::wallet::Wallet;
 use store::{CdkStore, Db};
 
-pub use cassis::{DEFAULT_RELAYS, PaymentOffer, normalize_relay};
+pub use cassis::{DEFAULT_RELAYS, PaymentNotes, PaymentOffer, normalize_relay};
 pub use mints::{Deposit, MintSummary, OnchainDeposit, OnchainOption, Withdrawal};
 pub use transactions::{TxKind, TxStatus, TxView};
-pub use proofs::{MintProofs, ProofHolder};
-
-/// The memo of the tokens an earlier version sent itself, between its cdk wallet and a Cassis
-/// wallet of the same mint. Hidden from the transactions: it was not money moving.
-pub(crate) const FLOAT_MEMO: &str = "praline:float";
+pub use proofs::MintProofs;
 
 /// A handle to the wallet. Cheap to clone.
 #[derive(Clone)]
@@ -49,6 +45,12 @@ struct Inner {
     wallets: Mutex<HashMap<String, Arc<Wallet>>>,
     /// The mints that pay and are paid with Cassis, by URL.
     cassis_mints: Mutex<HashSet<String>>,
+}
+
+impl Inner {
+    fn cassis_mints(&self) -> MutexGuard<'_, HashSet<String>> {
+        self.cassis_mints.lock().unwrap_or_else(|e| e.into_inner())
+    }
 }
 
 impl Drop for Inner {
@@ -278,7 +280,14 @@ mod tests {
         let offer = engine.run_blocking(engine.offer(offer.invoice)).expect("offer");
         println!("offer: {} sat, options {:?}", offer.amount_sat, offer.options);
         let paid = engine
-            .run_blocking(engine.pay(&offer, &offer.options[0].mint_url, Some("demo".into()), None, None))
+            .run_blocking(engine.pay(
+                &offer,
+                &offer.options[0].mint_url,
+                PaymentNotes {
+                    peer: Some("demo".into()),
+                    ..PaymentNotes::default()
+                },
+            ))
             .expect("pay");
         println!("paid {paid:?}");
 
